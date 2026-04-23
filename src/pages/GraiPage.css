@@ -1,0 +1,252 @@
+.grai-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.grai-page h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.grai-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1.5rem 0;
+}
+
+.grai-index-stats {
+  width: 100%;
+  max-width: 500px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.grai-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.grai-stat-row:last-child {
+  border-bottom: none;
+}
+
+.grai-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.grai-stat-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  font-family: 'Courier New', monospace;
+}
+
+.grai-actions-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+  width: 100%;
+  max-width: 1100px;
+}
+
+.grai-actions-row {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.grai-actions-row-mint {
+  justify-content: center;
+}
+
+.grai-actions-row-exit {
+  justify-content: center;
+}
+
+.grai-action-card {
+  flex: 1;
+  min-width: 260px;
+  max-width: 340px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.grai-action-card.grai-fast-exit {
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.grai-action-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.grai-action-placeholder {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.grai-action-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.grai-mint-asset-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.grai-mint-asset-tab {
+  flex: 1;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grai-mint-asset-tab:hover {
+  color: var(--text-primary);
+}
+
+.grai-mint-asset-tab.active {
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  color: white;
+}
+
+.grai-input-with-suffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.grai-input-with-suffix .grai-input {
+  flex: 1;
+  padding: 0.5rem 3rem 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.grai-input-with-suffix .grai-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.grai-input-suffix {
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.grai-mint-btn {
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grai-mint-btn:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.3);
+}
+
+.grai-burn-estimate {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.grai-burn-btn {
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grai-burn-btn:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+}
+
+.grai-exit-chart {
+  width: 100%;
+  height: 120px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.grai-exit-chart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.grai-sell-btn {
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grai-sell-btn:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+}
