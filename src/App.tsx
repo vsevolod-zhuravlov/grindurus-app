@@ -10,7 +10,7 @@ function App() {
   return (
     <div className="App">
       <Header activeView={mainView} onViewChange={setMainView} />
-      <main className="App-main">
+      <main className={`App-main ${mainView === 'backtest' ? 'App-main--backtest' : ''}`}>
         {mainView === 'grai' ? <GraiPage /> : <BacktestPage />}
       </main>
     </div>

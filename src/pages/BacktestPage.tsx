@@ -268,6 +268,7 @@ function BacktestPage() {
   const [promoApplied, setPromoApplied] = useState(false)
   const [queueColumns, setQueueColumns] = useState(4)
   const [queueBidValues, setQueueBidValues] = useState<Record<string, string>>({})
+  const [queueBidCustomOpen, setQueueBidCustomOpen] = useState<Record<string, boolean>>({})
   const [queueItems, setQueueItems] = useState<BacktestQueueItem[]>([])
   const [queueLoading, setQueueLoading] = useState(false)
   const [queueError, setQueueError] = useState('')
@@ -372,6 +373,11 @@ function BacktestPage() {
     const value = (queueBidValues[id] ?? '').trim()
     if (!value) return
     setQueueBidValues((prev) => ({ ...prev, [id]: value }))
+  }
+
+  const handleQueueBidOneUsdc = (id: string) => {
+    setQueueBidValues((prev) => ({ ...prev, [id]: '1' }))
+    handleQueueBidSubmit(id)
   }
 
   const quoteValue = quoteOptions.includes(quoteAsset) ? quoteAsset : quoteOptions[0]
@@ -546,6 +552,22 @@ function BacktestPage() {
                     </option>
                   ))}
                 </select>
+                <label className="backtest-sublabel backtest-sublabel--small" htmlFor="backtest-base-amt">
+                  Backtest amount
+                </label>
+                <div className="backtest-amount-with-suffix">
+                  <input
+                    id="backtest-base-amt"
+                    type="text"
+                    inputMode="decimal"
+                    className="backtest-amount-input"
+                    placeholder="0"
+                    value={baseAmount}
+                    onChange={(e) => setBaseAmount(sanitizeDecimal(e.target.value))}
+                    aria-label={`Amount, ${baseAsset}`}
+                  />
+                  <span className="backtest-amount-suffix">{baseAsset}</span>
+                </div>
               </div>
               <div className="backtest-pair-col">
                 <label className="backtest-sublabel" htmlFor="backtest-quote">
@@ -563,39 +585,22 @@ function BacktestPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="backtest-field backtest-amounts" role="group" aria-label="Amounts">
-            <div className="backtest-amount-row">
-              <div className="backtest-amount-with-suffix">
-                <input
-                  id="backtest-base-amt"
-                  type="text"
-                  inputMode="decimal"
-                  className="backtest-amount-input"
-                  placeholder="0"
-                  value={baseAmount}
-                  onChange={(e) => setBaseAmount(sanitizeDecimal(e.target.value))}
-                  aria-label={`Amount, ${baseAsset}`}
-                />
-                <span className="backtest-amount-suffix">{baseAsset}</span>
-              </div>
-            </div>
-            <div className="backtest-amount-row">
-              <div className="backtest-amount-with-suffix">
-                <input
-                  id="backtest-quote-amt"
-                  type="text"
-                  inputMode="decimal"
-                  className="backtest-amount-input"
-                  placeholder="0"
-                  value={quoteAmount}
-                  onChange={(e) => setQuoteAmount(sanitizeDecimal(e.target.value))}
-                  aria-label={`Amount, ${quoteAsset}`}
-                />
-                <span className="backtest-amount-suffix">{quoteAsset}</span>
+                <label className="backtest-sublabel backtest-sublabel--small" htmlFor="backtest-quote-amt">
+                  Backtest amount
+                </label>
+                <div className="backtest-amount-with-suffix">
+                  <input
+                    id="backtest-quote-amt"
+                    type="text"
+                    inputMode="decimal"
+                    className="backtest-amount-input"
+                    placeholder="0"
+                    value={quoteAmount}
+                    onChange={(e) => setQuoteAmount(sanitizeDecimal(e.target.value))}
+                    aria-label={`Amount, ${quoteAsset}`}
+                  />
+                  <span className="backtest-amount-suffix">{quoteAsset}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -614,6 +619,7 @@ function BacktestPage() {
                     {payBusy ? 'Processing…' : `Pay 1 ${quoteValue}`}
                   </button>
                   <div className="backtest-pay-method-wrap">
+                    <span className="backtest-pay-method-caption">Payment method</span>
                     <button
                       type="button"
                       className={`backtest-pay-method-btn ${payMenuOpen ? 'is-open' : ''}`}
@@ -730,9 +736,7 @@ function BacktestPage() {
             </div>
           </div>
           </aside>
-        </div>
-
-        <section className="backtest-main" aria-label="Backtest results">
+          <section className="backtest-main" aria-label="Backtest results">
           <div
             className="backtest-queue-wrap"
             role="region"
@@ -805,33 +809,73 @@ function BacktestPage() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="backtest-queue-bid-row">
-                                <div className="backtest-queue-bid-input-wrap">
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    className="backtest-queue-bid-input"
-                                    placeholder={`#${originalIdx + 1} bid`}
-                                    value={queueBidValues[item.id] ?? ''}
-                                    onChange={(e) => handleQueueBidChange(item.id, e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        handleQueueBidSubmit(item.id)
+                              <div
+                                className={`backtest-queue-bid-row ${
+                                  queueBidCustomOpen[item.id] ? 'is-custom' : ''
+                                }`}
+                              >
+                                {!queueBidCustomOpen[item.id] ? (
+                                  <div className="backtest-queue-bid-default-stack">
+                                    <button
+                                      type="button"
+                                      className="backtest-queue-bid-btn"
+                                      onClick={() => handleQueueBidOneUsdc(item.id)}
+                                    >
+                                      BID 1 USDC
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="backtest-queue-bid-btn backtest-queue-bid-btn--secondary"
+                                      onClick={() =>
+                                        setQueueBidCustomOpen((prev) => ({ ...prev, [item.id]: true }))
                                       }
-                                    }}
-                                    aria-label={`Bid amount for queue item #${originalIdx + 1}`}
-                                  />
-                                  <span className="backtest-queue-bid-suffix">USDC</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="backtest-queue-bid-btn"
-                                  onClick={() => handleQueueBidSubmit(item.id)}
-                                  disabled={!(queueBidValues[item.id] ?? '').trim()}
-                                >
-                                  BID
-                                </button>
+                                    >
+                                      BID CUSTOM
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="backtest-queue-bid-custom-inline">
+                                      <button
+                                        type="button"
+                                        className="backtest-queue-bid-btn backtest-queue-bid-btn--secondary"
+                                        onClick={() =>
+                                          setQueueBidCustomOpen((prev) => ({ ...prev, [item.id]: false }))
+                                        }
+                                      >
+                                        BACK
+                                      </button>
+                                      <div className="backtest-queue-bid-custom-submit-row">
+                                        <div className="backtest-queue-bid-input-wrap">
+                                          <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="backtest-queue-bid-input"
+                                            placeholder={`#${originalIdx + 1} bid`}
+                                            value={queueBidValues[item.id] ?? ''}
+                                            onChange={(e) => handleQueueBidChange(item.id, e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault()
+                                                handleQueueBidSubmit(item.id)
+                                              }
+                                            }}
+                                            aria-label={`Bid amount for queue item #${originalIdx + 1}`}
+                                          />
+                                          <span className="backtest-queue-bid-suffix">USDC</span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="backtest-queue-bid-btn"
+                                          onClick={() => handleQueueBidSubmit(item.id)}
+                                          disabled={!(queueBidValues[item.id] ?? '').trim()}
+                                        >
+                                          BID
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -848,45 +892,46 @@ function BacktestPage() {
               <div className="backtest-queue-end-hint">Queue is empty.</div>
             )}
           </div>
-          <section className="backtest-results-card" aria-label="Backtest output">
-            <h1 className="backtest-main-title">Backtest</h1>
-            <p className="backtest-main-subtitle">
-              Pair <strong>{featuredBacktest.base}</strong> / <strong>{featuredBacktest.quote}</strong>,{' '}
-              <strong>
-                {featuredBacktest.dateFrom} – {featuredBacktest.dateTo}
-              </strong>{' '}
-              ({featuredRangeDays} days). Charts and fills will appear here after payment.
-            </p>
-            <div className="backtest-placeholder" aria-label="Backtest chart preview">
-              <svg
-                className="backtest-placeholder-chart"
-                viewBox="0 0 100 42"
-                role="img"
-                aria-label="Upward pink equity curve"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="backtest-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgba(255, 105, 180, 0.42)" />
-                    <stop offset="100%" stopColor="rgba(255, 105, 180, 0.02)" />
-                  </linearGradient>
-                </defs>
-                <g className="backtest-placeholder-grid">
-                  <line x1="0" y1="10" x2="100" y2="10" />
-                  <line x1="0" y1="20" x2="100" y2="20" />
-                  <line x1="0" y1="30" x2="100" y2="30" />
-                </g>
-                <path
-                  className="backtest-placeholder-area"
-                  d="M2 36 L2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6 L98 36 Z"
-                />
-                <path
-                  className="backtest-placeholder-line"
-                  d="M2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6"
-                />
-              </svg>
-            </div>
           </section>
+        </div>
+        <section className="backtest-results-card" aria-label="Backtest output">
+          <h1 className="backtest-main-title">Backtest</h1>
+          <p className="backtest-main-subtitle">
+            Pair <strong>{featuredBacktest.base}</strong> / <strong>{featuredBacktest.quote}</strong>,{' '}
+            <strong>
+              {featuredBacktest.dateFrom} – {featuredBacktest.dateTo}
+            </strong>{' '}
+            ({featuredRangeDays} days).
+          </p>
+          <div className="backtest-placeholder" aria-label="Backtest chart preview">
+            <svg
+              className="backtest-placeholder-chart"
+              viewBox="0 0 100 42"
+              role="img"
+              aria-label="Upward pink equity curve"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="backtest-chart-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(255, 105, 180, 0.42)" />
+                  <stop offset="100%" stopColor="rgba(255, 105, 180, 0.02)" />
+                </linearGradient>
+              </defs>
+              <g className="backtest-placeholder-grid">
+                <line x1="0" y1="10" x2="100" y2="10" />
+                <line x1="0" y1="20" x2="100" y2="20" />
+                <line x1="0" y1="30" x2="100" y2="30" />
+              </g>
+              <path
+                className="backtest-placeholder-area"
+                d="M2 36 L2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6 L98 36 Z"
+              />
+              <path
+                className="backtest-placeholder-line"
+                d="M2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6"
+              />
+            </svg>
+          </div>
         </section>
       </div>
     </div>

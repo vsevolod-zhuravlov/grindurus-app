@@ -1,19 +1,25 @@
 .backtest-page {
   padding: 1.5rem 0 2rem;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .backtest-layout {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   gap: 1.75rem;
 }
 
 .backtest-panel-wrap {
-  flex: 0 0 300px;
-  max-width: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(300px, 327px) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 1.75rem;
+  row-gap: 0.25rem;
+  align-items: start;
 }
 
 .backtest-panel {
@@ -23,7 +29,7 @@
   padding: 1.25rem 1.25rem 1.35rem;
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 0.1rem;
   overflow: visible;
   position: relative;
   z-index: 2;
@@ -33,8 +39,11 @@
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.15rem;
   padding: 0 0.1rem;
+  grid-column: 1;
+  grid-row: 1;
+  text-align: left;
 }
 
 .backtest-field {
@@ -57,6 +66,23 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.backtest-sublabel--small {
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+}
+
+.backtest-pair-col:first-child .backtest-sublabel--small {
+  align-self: flex-start;
+  width: max-content;
+  margin-left: 0;
+}
+
+.backtest-pair-col:last-child .backtest-sublabel--small {
+  align-self: flex-end;
+  width: max-content;
+  margin-right: 0;
 }
 
 .backtest-dates {
@@ -102,9 +128,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  padding: 0.65rem 0.7rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  padding: 0.65rem 0;
   border-radius: 10px;
 }
 
@@ -214,14 +238,16 @@
 
 .backtest-pay-actions {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 0.5rem;
 }
 
 .backtest-pay-btn {
   flex: 1;
   min-width: 0;
-  padding: 0.65rem 0.75rem;
+  min-height: 37px;
+  height: 37px;
+  padding: 0 0.75rem;
   border: none;
   border-radius: 10px;
   background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
@@ -229,6 +255,9 @@
   font-size: 0.88rem;
   font-weight: 700;
   font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: box-shadow 0.2s ease, opacity 0.2s ease, transform 0.15s ease;
 }
@@ -245,10 +274,23 @@
 
 .backtest-pay-method-wrap {
   flex-shrink: 0;
-  align-self: stretch;
+  align-self: flex-end;
   width: 7.75rem;
   min-width: 7.75rem;
   max-width: 7.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
+}
+
+.backtest-pay-method-caption {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  line-height: 1;
 }
 
 .backtest-pay-method-list {
@@ -524,9 +566,12 @@
 .backtest-main {
   position: relative;
   z-index: 0;
-  flex: 1;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  width: 100%;
   min-width: 0;
-  padding-top: 0.15rem;
+  padding-top: 0;
 }
 
 .backtest-queue-wrap {
@@ -544,7 +589,7 @@
 }
 
 .backtest-queue-label {
-  font-size: 0.96rem;
+  font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-primary);
@@ -887,6 +932,26 @@
   margin-top: 0.25rem;
   display: flex;
   align-items: center;
+  flex-direction: row;
+  gap: 0.35rem;
+}
+
+.backtest-queue-bid-default-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.backtest-queue-bid-default-stack .backtest-queue-bid-btn {
+  width: 100%;
+}
+
+.backtest-queue-bid-custom-inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.35rem;
 }
 
@@ -929,7 +994,7 @@
 }
 
 .backtest-queue-bid-btn {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   padding: 0.28rem 0.5rem;
   border: 1px solid #ff69b4;
   border-radius: 7px;
@@ -939,6 +1004,22 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   cursor: pointer;
+}
+
+.backtest-queue-bid-custom-inline .backtest-queue-bid-btn {
+  flex: 0 0 auto;
+}
+
+.backtest-queue-bid-custom-submit-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.backtest-queue-bid-btn--secondary {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
 }
 
 .backtest-queue-bid-btn:hover:not(:disabled) {
@@ -1016,12 +1097,12 @@
 }
 
 @media (max-width: 768px) {
-  .backtest-layout {
-    flex-direction: column;
+  .backtest-panel-wrap {
+    display: block;
+    width: 100%;
   }
 
-  .backtest-panel-wrap {
-    flex: none;
-    width: 100%;
+  .backtest-main {
+    margin-top: 1rem;
   }
 }
