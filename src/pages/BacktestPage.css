@@ -242,6 +242,29 @@
   gap: 0.5rem;
 }
 
+.backtest-promocode-inline-wrap {
+  margin-top: 0.4rem;
+  width: 100%;
+}
+
+.backtest-promocode-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.backtest-promocode-inline .backtest-promo-input {
+  flex: 1;
+}
+
+.backtest-promocode-inline-status {
+  margin: 0.3rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7dffb2;
+}
+
 .backtest-pay-btn {
   flex: 1;
   min-width: 0;
@@ -440,6 +463,38 @@
   color: #78e7ae;
 }
 
+.backtest-network-switch {
+  margin-top: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.backtest-network-switch-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backtest-network-switch-btn {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0.38rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 2.05rem;
+  cursor: pointer;
+}
+
+.backtest-network-switch-btn:hover {
+  background: var(--bg-tertiary);
+}
+
 .backtest-promo-anchor {
   position: relative;
   display: flex;
@@ -597,6 +652,55 @@
   text-align: left;
 }
 
+.backtest-queue-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.backtest-queue-sort-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backtest-queue-sort-switch {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.backtest-queue-sort-btn {
+  border: 0;
+  border-right: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.22rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.backtest-queue-sort-btn:last-child {
+  border-right: 0;
+}
+
+.backtest-queue-sort-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.backtest-queue-sort-btn.is-active {
+  background: rgba(255, 105, 180, 0.14);
+  color: var(--text-primary);
+}
+
 .backtest-queue-extend-btn {
   flex-shrink: 0;
   padding: 0.26rem 0.65rem;
@@ -626,7 +730,7 @@
 }
 
 .backtest-queue-scroller.is-extended {
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: auto;
   max-height: 24rem;
   padding-right: 0.2rem;
@@ -679,8 +783,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  width: fit-content;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 .backtest-queue-grid-row {
@@ -689,6 +793,7 @@
   align-items: stretch;
   justify-content: flex-start;
   gap: 0.6rem;
+  width: 100%;
 }
 
 .backtest-queue-grid-row.is-reverse {
@@ -702,8 +807,9 @@
 }
 
 .backtest-queue-grid-row .backtest-queue-item {
-  flex: 0 0 12rem;
-  width: 12rem;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
   scroll-snap-align: none;
 }
 
@@ -818,7 +924,7 @@
 .backtest-queue-grid-row .backtest-queue-card {
   width: 100%;
   min-width: 0;
-  max-width: 12rem;
+  max-width: none;
 }
 
 .backtest-queue-pair {

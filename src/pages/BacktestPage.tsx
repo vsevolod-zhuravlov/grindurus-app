@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { x402Client, wrapFetchWithPayment } from '@x402/fetch'
+import { registerExactEvmScheme } from '@x402/evm/exact/client'
+import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import './BacktestPage.css'
 
 const BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
 const QUOTE_ASSETS = ['USDC', 'USDT', 'USD', 'SOL'] as const
 
-const PAY_METHODS = ['x402', 'kirapay'] as const
+const PAY_METHODS = ['x402', 'kirapay', 'promocode'] as const
 type PayMethod = (typeof PAY_METHODS)[number]
 const PAY_METHOD_LABEL: Record<PayMethod, string> = {
   x402: 'x402',
   kirapay: 'kirapay',
+  promocode: 'promocode',
 }
 
 type BacktestQueueItem = {
@@ -225,6 +229,11 @@ function formatBacktestApiError(data: unknown, status: number): string {
   if (typeof data === 'string' && data.trim()) return data.trim()
   if (data && typeof data === 'object') {
     const o = data as Record<string, unknown>
+    const code = typeof o.code === 'string' ? o.code : ''
+    if (code === 'promocode_missing') return 'Promocode is required. Enter code and click Apply.'
+    if (code === 'promocode_invalid') return 'Invalid promocode. Check the code and try again.'
+
+    if (typeof o.error === 'string' && o.error.trim()) return o.error
     const detail = o.detail
     if (typeof detail === 'string') return detail
     if (Array.isArray(detail)) {
@@ -263,17 +272,23 @@ function BacktestPage() {
   const [paySuccess, setPaySuccess] = useState('')
   const [payMethod, setPayMethod] = useState<PayMethod>('x402')
   const [payMenuOpen, setPayMenuOpen] = useState(false)
-  const [promoExpanded, setPromoExpanded] = useState(false)
   const [promocode, setPromocode] = useState('')
-  const [promoApplied, setPromoApplied] = useState(false)
+  const [appliedPromocode, setAppliedPromocode] = useState('')
   const [queueColumns, setQueueColumns] = useState(4)
   const [queueBidValues, setQueueBidValues] = useState<Record<string, string>>({})
   const [queueBidCustomOpen, setQueueBidCustomOpen] = useState<Record<string, boolean>>({})
   const [queueItems, setQueueItems] = useState<BacktestQueueItem[]>([])
+  const [queueSortBy, setQueueSortBy] = useState<'priority' | 'created_at'>('priority')
   const [queueLoading, setQueueLoading] = useState(false)
   const [queueError, setQueueError] = useState('')
+  const [showX402NetworkSwitch, setShowX402NetworkSwitch] = useState(false)
   const payMethodWrapRef = useRef<HTMLDivElement>(null)
   const queueScrollerRef = useRef<HTMLDivElement>(null)
+  const { isConnected: isEvmConnected } = useAccount()
+  const chainId = useChainId()
+  const { switchChain } = useSwitchChain()
+  const { data: walletClient } = useWalletClient()
+  const walletNetwork = useMemo(() => (chainId ? `eip155:${chainId}` : null), [chainId])
 
   const quoteOptions = useMemo(
     () => QUOTE_ASSETS.filter((q) => !(baseAsset === 'SOL' && q === 'SOL')),
@@ -300,6 +315,20 @@ function BacktestPage() {
     setPayMenuOpen(false)
     setPayError('')
     setPaySuccess('')
+    setAppliedPromocode('')
+    setShowX402NetworkSwitch(false)
+    if (payMethod === 'x402' && !isEvmConnected) {
+      setPayError('Connect an EVM wallet to pay with x402.')
+      return
+    }
+    if (payMethod === 'x402' && !paidFetch) {
+      setPayError('Unable to initialize x402 payment client.')
+      return
+    }
+    if (payMethod === 'promocode' && !appliedPromocode) {
+      setPayError('Apply promocode first.')
+      return
+    }
     setPayBusy(true)
     try {
       const endpoint = `${backtestApiOrigin}/backtest`
@@ -307,6 +336,7 @@ function BacktestPage() {
         owner_address: '0x0000000000000000000000000000000000000001',
         params: {
           payment_method: payMethod,
+          wallet_network: walletNetwork,
           base_asset: baseAsset,
           quote_asset: quoteValue,
           base_amount: baseAmount.trim() || '0',
@@ -316,11 +346,19 @@ function BacktestPage() {
           priority_usdc: '1',
         },
       })
-      const response = await fetch(endpoint, {
+      const requestWithPayment = payMethod === 'x402' ? paidFetch : fetch
+      if (!requestWithPayment) {
+        throw new Error('Unable to initialize payment transport.')
+      }
+      const response = await requestWithPayment(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Payment-Method': payMethod,
+          ...(payMethod === 'promocode' && appliedPromocode
+            ? { 'X-Promocode': appliedPromocode }
+            : {}),
+          ...(walletNetwork ? { 'X-Wallet-Network': walletNetwork } : {}),
         },
         body,
       })
@@ -345,24 +383,30 @@ function BacktestPage() {
       )
       await loadQueue()
     } catch (err) {
-      setPayError(err instanceof Error ? err.message : 'Failed to enqueue backtest')
+      const message = err instanceof Error ? err.message : 'Failed to enqueue backtest'
+      if (
+        payMethod === 'x402' &&
+        (message.includes('No scheme registered') ||
+          message.includes('No network/scheme registered') ||
+          message.includes('Failed to create payment payload'))
+      ) {
+        setPayError(
+          'x402 is not available for the current wallet network. Please switch network.'
+        )
+        setShowX402NetworkSwitch(true)
+      } else {
+        setPayError(message)
+      }
     } finally {
       setPayBusy(false)
-    }
-  }
-
-  const handlePromoToggle = (checked: boolean) => {
-    setPromoExpanded(checked)
-    if (!checked) {
-      setPromocode('')
-      setPromoApplied(false)
     }
   }
 
   const handlePromoApply = () => {
     const code = promocode.trim()
     if (!code) return
-    setPromoApplied(true)
+    setAppliedPromocode(code)
+    setPayError('')
   }
 
   const handleQueueBidChange = (id: string, raw: string) => {
@@ -380,19 +424,54 @@ function BacktestPage() {
     handleQueueBidSubmit(id)
   }
 
+  const handleSwitchBase = () => {
+    setPayError('')
+    setPaySuccess('')
+    setShowX402NetworkSwitch(false)
+    switchChain({ chainId: 8453 })
+  }
+
+  const handleSwitchSolana = () => {
+    setPayError('')
+    setPaySuccess('')
+    setShowX402NetworkSwitch(false)
+    setPayMethod('kirapay')
+  }
+
   const quoteValue = quoteOptions.includes(quoteAsset) ? quoteAsset : quoteOptions[0]
 
   const backtestApiOrigin = useMemo(
     () => (import.meta.env.VITE_BACKTEST_API_URL ?? 'http://localhost:8001').replace(/\/$/, ''),
     []
   )
+  const paidFetch = useMemo(() => {
+    if (!walletClient?.account?.address) return null
+    const client = new x402Client()
+    registerExactEvmScheme(client, {
+      signer: {
+        address: walletClient.account.address,
+        signTypedData: (typedData: Parameters<typeof walletClient.signTypedData>[0]) =>
+          walletClient.signTypedData({
+            ...typedData,
+            account: walletClient.account,
+          }),
+      } as any,
+      ...(walletNetwork ? { networks: [walletNetwork] } : {}),
+    })
+    return wrapFetchWithPayment(fetch, client)
+  }, [walletClient, walletNetwork])
 
   const loadQueue = useCallback(
     async (signal?: AbortSignal) => {
       setQueueLoading(true)
       setQueueError('')
       try {
-        const response = await fetch(`${backtestApiOrigin}/queue?limit=1000`, { signal })
+        const params = new URLSearchParams({
+          limit: '1000',
+          sort_by: queueSortBy,
+          sort_order: 'desc',
+        })
+        const response = await fetch(`${backtestApiOrigin}/queue?${params.toString()}`, { signal })
         const raw = await response.text()
         const payload = raw ? (JSON.parse(raw) as unknown) : []
         if (!response.ok) {
@@ -427,7 +506,7 @@ function BacktestPage() {
         setQueueLoading(false)
       }
     },
-    [backtestApiOrigin]
+    [backtestApiOrigin, queueSortBy]
   )
 
   useEffect(() => {
@@ -479,10 +558,6 @@ function BacktestPage() {
 
   const visibleQueue = queueItems
   const queueRows = useMemo(() => chunkArray(visibleQueue, queueColumns), [visibleQueue, queueColumns])
-  const queueRowWidthRem = useMemo(
-    () => queueColumns * 12 + Math.max(0, queueColumns - 1) * 0.6,
-    [queueColumns]
-  )
   const featuredBacktest = visibleQueue[0] ?? DEMO_BACKTEST_QUEUE[0]
   const featuredRangeDays = useMemo(
     () => daysInclusive(featuredBacktest.dateFrom, featuredBacktest.dateTo),
@@ -641,6 +716,45 @@ function BacktestPage() {
                     </button>
                   </div>
                 </div>
+                {payMethod === 'promocode' && (
+                  <div className="backtest-promocode-inline-wrap">
+                    <div className="backtest-promocode-inline">
+                      <input
+                        id="backtest-promocode-inline"
+                        type="text"
+                        className="backtest-promo-input"
+                        value={promocode}
+                        onChange={(e) => {
+                          setPromocode(e.target.value)
+                          setAppliedPromocode('')
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && promocode.trim()) {
+                            e.preventDefault()
+                            handlePromoApply()
+                          }
+                        }}
+                        placeholder="Enter promocode"
+                        autoComplete="off"
+                        spellCheck={false}
+                        aria-label="Promocode"
+                      />
+                      <button
+                        type="button"
+                        className="backtest-promo-apply"
+                        onClick={handlePromoApply}
+                        disabled={!promocode.trim()}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    {appliedPromocode && (
+                      <p className="backtest-promocode-inline-status" aria-live="polite">
+                        Promocode applied. Now click Pay 1 {quoteValue}.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {payMenuOpen && (
                   <div
                     className="backtest-pay-method-list"
@@ -658,6 +772,8 @@ function BacktestPage() {
                         }`}
                         onClick={() => {
                           setPayMethod(m)
+                          setPayError('')
+                          setPaySuccess('')
                           setPayMenuOpen(false)
                         }}
                       >
@@ -673,67 +789,17 @@ function BacktestPage() {
                 {payError || paySuccess}
               </p>
             )}
-            <div className="backtest-promo-anchor">
-              <label className="backtest-promo-check">
-                <input
-                  id="backtest-promo-toggle"
-                  type="checkbox"
-                  className="backtest-promo-check-input"
-                  checked={promoExpanded}
-                  onChange={(e) => handlePromoToggle(e.target.checked)}
-                />
-                <span className="backtest-promo-check-text">I have promocode</span>
-              </label>
-              {promoExpanded && (
-                <div className="backtest-promo-panel">
-                  {promoApplied && (
-                    <span
-                      id="backtest-promo-applied-ann"
-                      className="backtest-sr-only"
-                      aria-live="polite"
-                    >
-                      Promocode applied
-                    </span>
-                  )}
-                  <div className="backtest-promo-row">
-                    <input
-                      id="backtest-promocode"
-                      type="text"
-                      className="backtest-promo-input"
-                      value={promocode}
-                      onChange={(e) => {
-                        setPromocode(e.target.value)
-                        setPromoApplied(false)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && promocode.trim()) {
-                          e.preventDefault()
-                          handlePromoApply()
-                        }
-                      }}
-                      placeholder="Enter code"
-                      autoComplete="off"
-                      spellCheck={false}
-                      aria-label="Promocode"
-                      aria-describedby={promoApplied ? 'backtest-promo-applied-ann' : undefined}
-                    />
-                    {promoApplied && (
-                      <span className="backtest-promo-checkmark" aria-hidden="true">
-                        ✓
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      className="backtest-promo-apply"
-                      onClick={handlePromoApply}
-                      disabled={!promocode.trim()}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {showX402NetworkSwitch && payMethod === 'x402' && (
+              <div className="backtest-network-switch" aria-live="polite">
+                <span className="backtest-network-switch-label">Switch network to:</span>
+                <button type="button" className="backtest-network-switch-btn" onClick={handleSwitchBase}>
+                  Base
+                </button>
+                <button type="button" className="backtest-network-switch-btn" onClick={handleSwitchSolana}>
+                  Solana
+                </button>
+              </div>
+            )}
           </div>
           </aside>
           <section className="backtest-main" aria-label="Backtest results">
@@ -746,6 +812,27 @@ function BacktestPage() {
               <p id="backtest-queue-label" className="backtest-queue-label">
                 Backtest queue
               </p>
+              <div className="backtest-queue-sort" aria-label="Queue sorting">
+                <span className="backtest-queue-sort-label">Sort by:</span>
+                <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
+                  <button
+                    type="button"
+                    className={`backtest-queue-sort-btn ${queueSortBy === 'priority' ? 'is-active' : ''}`}
+                    onClick={() => setQueueSortBy('priority')}
+                    aria-pressed={queueSortBy === 'priority'}
+                  >
+                    Priority
+                  </button>
+                  <button
+                    type="button"
+                    className={`backtest-queue-sort-btn ${queueSortBy === 'created_at' ? 'is-active' : ''}`}
+                    onClick={() => setQueueSortBy('created_at')}
+                    aria-pressed={queueSortBy === 'created_at'}
+                  >
+                    Date
+                  </button>
+                </div>
+              </div>
             </div>
             <div
               id="backtest-queue-scroller"
@@ -764,7 +851,6 @@ function BacktestPage() {
                       className={`backtest-queue-grid-row ${isReverse ? 'is-reverse' : ''} ${
                         rowIdx < queueRows.length - 1 ? 'has-next' : ''
                       }`}
-                      style={{ width: `${queueRowWidthRem}rem` }}
                       role="listitem"
                     >
                       {visualRow.map((item, visualIdx) => {

@@ -3,9 +3,8 @@ import { base, baseSepolia } from 'wagmi/chains'
 import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useEvmWallet } from '../hooks/useEvmWallet'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
+import baseNetworkIcon from '../assets/base-network.svg'
 import './WalletStyles.css'
-
-const BASE_ICON_URL = 'https://assets.coingecko.com/coins/images/27947/small/base.png'
 
 export function WalletInfo() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -74,7 +73,7 @@ export function WalletInfo() {
         return (
           <img
             className="wallet-current-network-icon"
-            src={BASE_ICON_URL}
+            src={baseNetworkIcon}
             alt="Base"
             width={20}
             height={20}
@@ -86,7 +85,7 @@ export function WalletInfo() {
         return (
           <img
             className="wallet-current-network-icon"
-            src={BASE_ICON_URL}
+            src={baseNetworkIcon}
             alt="Base Sepolia"
             width={20}
             height={20}
@@ -166,7 +165,7 @@ export function WalletInfo() {
             </svg>
           )}
           {(currentChain.name === 'Base' || currentChain.name === 'Base Sepolia') && (
-            <img src={BASE_ICON_URL} alt={currentChain.name} width={20} height={20} />
+            <img src={baseNetworkIcon} alt={currentChain.name} width={20} height={20} />
           )}
         </span>
       )
@@ -268,7 +267,7 @@ export function WalletInfo() {
                             </svg>
                           )}
                           {(chain.name === 'Base' || chain.name === 'Base Sepolia') && (
-                            <img src={BASE_ICON_URL} alt={chain.name} width={20} height={20} />
+                            <img src={baseNetworkIcon} alt={chain.name} width={20} height={20} />
                           )}
                         </span>
                         <span className="network-name">{chain.name}</span>
