@@ -61,7 +61,7 @@ export function WalletInfo() {
         return (
           <img
             className="wallet-current-network-icon"
-            src="https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg"
+            src="https://cryptologos.cc/logos/arbitrum-arb-logo.png?v=040"
             alt="Arbitrum"
             width={20}
             height={20}
@@ -106,7 +106,7 @@ export function WalletInfo() {
 
       return (
         <img
-          className="wallet-current-network-icon"
+          className="wallet-current-network-icon wallet-current-network-icon--ethereum"
           src="https://assets.coingecko.com/coins/images/279/small/ethereum.png"
           alt="Ethereum"
           width={20}
@@ -146,11 +146,12 @@ export function WalletInfo() {
               alt="Ethereum"
               width={20}
               height={20}
+              className="network-logo-img network-logo-img--ethereum"
             />
           )}
           {currentChain.name === 'Arbitrum' && (
             <img
-              src="https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg"
+              src="https://cryptologos.cc/logos/arbitrum-arb-logo.png?v=040"
               alt="Arbitrum"
               width={20}
               height={20}
@@ -248,11 +249,12 @@ export function WalletInfo() {
                               alt="Ethereum"
                               width={20}
                               height={20}
+                              className="network-logo-img network-logo-img--ethereum"
                             />
                           )}
                           {chain.name === 'Arbitrum' && (
                             <img
-                              src="https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg"
+                              src="https://cryptologos.cc/logos/arbitrum-arb-logo.png?v=040"
                               alt="Arbitrum"
                               width={20}
                               height={20}

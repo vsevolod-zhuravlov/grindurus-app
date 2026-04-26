@@ -782,7 +782,7 @@
 .backtest-queue-grid-rows {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 1.2rem;
   width: 100%;
   margin: 0;
 }
@@ -792,7 +792,7 @@
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 0.6rem;
+  gap: 1.3rem;
   width: 100%;
 }
 
@@ -808,7 +808,7 @@
 
 .backtest-queue-grid-row .backtest-queue-item {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 11.75rem;
   width: auto;
   scroll-snap-align: none;
 }
@@ -841,11 +841,12 @@
 .backtest-queue-grid-row:not(.is-reverse) .backtest-queue-item.has-connector::after {
   content: '';
   position: absolute;
-  right: -0.45rem;
-  bottom: 0.9rem;
-  width: 0.45rem;
+  left: -1.22rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.22rem;
   height: 2px;
-  background: linear-gradient(90deg, rgba(255, 105, 180, 0.75), rgba(255, 105, 180, 0.25));
+  background: linear-gradient(90deg, rgba(255, 105, 180, 0.25), rgba(255, 105, 180, 0.75));
   border-radius: 999px;
   pointer-events: none;
 }
@@ -853,24 +854,27 @@
 .backtest-queue-grid-row:not(.is-reverse) .backtest-queue-item.has-connector::before {
   content: '';
   position: absolute;
-  right: -0.02rem;
-  bottom: 0.81rem;
-  width: 0.22rem;
-  height: 0.22rem;
-  border-radius: 50%;
-  background: #ff69b4;
-  box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.18);
+  left: -1.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 10px solid #ff69b4;
+  filter: drop-shadow(0 0 2px rgba(255, 105, 180, 0.45));
   pointer-events: none;
 }
 
 .backtest-queue-grid-row.is-reverse .backtest-queue-item.has-connector::after {
   content: '';
   position: absolute;
-  left: -0.45rem;
-  bottom: 0.9rem;
-  width: 0.45rem;
+  right: -1.22rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.22rem;
   height: 2px;
-  background: linear-gradient(90deg, rgba(255, 105, 180, 0.25), rgba(255, 105, 180, 0.75));
+  background: linear-gradient(90deg, rgba(255, 105, 180, 0.75), rgba(255, 105, 180, 0.25));
   border-radius: 999px;
   pointer-events: none;
 }
@@ -878,38 +882,52 @@
 .backtest-queue-grid-row.is-reverse .backtest-queue-item.has-connector::before {
   content: '';
   position: absolute;
-  left: -0.02rem;
-  bottom: 0.81rem;
-  width: 0.22rem;
-  height: 0.22rem;
-  border-radius: 50%;
-  background: #ff69b4;
-  box-shadow: 0 0 0 2px rgba(255, 105, 180, 0.18);
+  right: -1.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 10px solid #ff69b4;
+  filter: drop-shadow(0 0 2px rgba(255, 105, 180, 0.45));
   pointer-events: none;
 }
 
 .backtest-queue-grid-row.has-next::after {
+  content: none;
+}
+
+.backtest-queue-grid-row .backtest-queue-item.has-next-link .backtest-queue-card::after {
   content: '';
   position: absolute;
-  bottom: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -1.2rem;
   width: 2px;
-  height: 0.6rem;
+  height: 1.2rem;
   background: linear-gradient(180deg, rgba(255, 105, 180, 0.75), rgba(255, 105, 180, 0.22));
   border-radius: 999px;
   pointer-events: none;
 }
 
-.backtest-queue-grid-row.has-next:not(.is-reverse)::after {
-  right: 0.1rem;
-}
-
-.backtest-queue-grid-row.has-next.is-reverse::after {
-  left: 0.1rem;
+.backtest-queue-grid-row .backtest-queue-item.has-next-link .backtest-queue-card::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% - 1px);
+  width: 10px;
+  height: 8px;
+  background: #ff69b4;
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+  filter: drop-shadow(0 0 2px rgba(255, 105, 180, 0.45));
+  pointer-events: none;
 }
 
 .backtest-queue-card {
-  min-width: 10.5rem;
-  max-width: 12rem;
+  min-width: 11.75rem;
+  max-width: 13.5rem;
   padding: 0.55rem 0.65rem 0.5rem;
   border-radius: 10px;
   border: 1px solid var(--border-color);
@@ -925,6 +943,59 @@
   width: 100%;
   min-width: 0;
   max-width: none;
+}
+
+.backtest-queue-card--leader {
+  position: relative;
+  border-color: rgba(255, 105, 180, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(255, 105, 180, 0.65),
+    0 0 12px rgba(255, 105, 180, 0.5),
+    0 0 24px rgba(255, 20, 147, 0.35);
+  overflow: hidden;
+}
+
+.backtest-queue-card--leader::before {
+  content: '👑';
+  position: absolute;
+  left: 50%;
+  top: -0.92rem;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  line-height: 1;
+  z-index: 3;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+
+.backtest-queue-card--leader::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 10px;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 105, 180, 0.2),
+    rgba(255, 20, 147, 0.32),
+    rgba(125, 255, 178, 0.22),
+    rgba(255, 105, 180, 0.2)
+  );
+  background-size: 240% 240%;
+  animation: backtest-leader-gradient 4s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes backtest-leader-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .backtest-queue-pair {
@@ -1142,6 +1213,7 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 0.5rem;
+  align-self: flex-start;
 }
 
 .backtest-results-card {
@@ -1152,6 +1224,8 @@
   border-radius: 12px;
   background: var(--bg-secondary);
   padding: 1rem;
+  text-align: left;
+  align-items: stretch;
 }
 
 .backtest-main-subtitle {
@@ -1159,6 +1233,7 @@
   font-size: 0.95rem;
   margin: 0 0 1.25rem;
   line-height: 1.45;
+  align-self: flex-start;
 }
 
 .backtest-main-subtitle strong {
@@ -1200,6 +1275,36 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 4px rgba(255, 105, 180, 0.35));
+}
+
+.backtest-placeholder-candles .backtest-candle-wick {
+  stroke-width: 0.45;
+  stroke-linecap: round;
+}
+
+.backtest-placeholder-candles .backtest-candle-wick.is-up {
+  stroke: #7dffb2;
+}
+
+.backtest-placeholder-candles .backtest-candle-wick.is-down {
+  stroke: #ff7fbc;
+}
+
+.backtest-placeholder-candles .backtest-candle-body {
+  rx: 0.35;
+  ry: 0.35;
+}
+
+.backtest-placeholder-candles .backtest-candle-body.is-up {
+  fill: rgba(125, 255, 178, 0.9);
+  stroke: rgba(125, 255, 178, 0.55);
+  stroke-width: 0.2;
+}
+
+.backtest-placeholder-candles .backtest-candle-body.is-down {
+  fill: rgba(255, 127, 188, 0.88);
+  stroke: rgba(255, 127, 188, 0.5);
+  stroke-width: 0.2;
 }
 
 @media (max-width: 768px) {

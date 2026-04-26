@@ -18,6 +18,7 @@ export function useSolanaWallet() {
     connected,
     connecting,
     disconnect: walletDisconnect,
+    signTransaction,
     wallet,
     wallets,
     select,
@@ -51,6 +52,25 @@ export function useSolanaWallet() {
     }
     if (walletName.includes('solflare')) {
       return detectClusterFromRpcEndpoint(globalAny.solflare?.connection?.rpcEndpoint)
+    }
+
+    return null
+  }, [wallet])
+
+  const walletDetectedRpcEndpoint = useMemo(() => {
+    if (!wallet) return null
+
+    const globalAny = window as unknown as {
+      phantom?: { solana?: { connection?: { rpcEndpoint?: string } } }
+      solflare?: { connection?: { rpcEndpoint?: string } }
+    }
+
+    const walletName = wallet.adapter.name.toLowerCase()
+    if (walletName.includes('phantom')) {
+      return globalAny.phantom?.solana?.connection?.rpcEndpoint ?? null
+    }
+    if (walletName.includes('solflare')) {
+      return globalAny.solflare?.connection?.rpcEndpoint ?? null
     }
 
     return null
@@ -96,13 +116,28 @@ export function useSolanaWallet() {
   const selectWallet = useCallback(
     async (walletName: string) => {
       const found = wallets.find((w) => w.adapter.name === walletName)
-      if (found) {
-        select(found.adapter.name)
-        try {
-          await connect()
-        } catch {
-          // User rejected or wallet still initializing
+      if (!found) return
+
+      select(found.adapter.name)
+
+      // Wallet adapter updates selected wallet state asynchronously.
+      // A tiny delay prevents WalletNotSelectedError race on immediate connect().
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      try {
+        await connect()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const isNotSelected = message.includes('Wallet not selected') || message.includes('WalletNotSelectedError')
+        if (isNotSelected) {
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 50))
+            await connect()
+          } catch {
+            // User rejected, wallet locked, or adapter still initializing.
+          }
+          return
         }
+        // User rejected or wallet still initializing.
       }
     },
     [wallets, select, connect]
@@ -117,9 +152,11 @@ export function useSolanaWallet() {
     cluster: effectiveCluster,
     clusterName: effectiveClusterName,
     wallet,
+    signTransaction,
     wallets: allWallets,
     detectedWallets,
     connection,
+    rpcEndpoint: walletDetectedRpcEndpoint ?? connection.rpcEndpoint,
     supportedClusters,
     connect: openModal,
     disconnect,

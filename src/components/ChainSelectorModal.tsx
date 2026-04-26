@@ -39,9 +39,9 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
     onClose()
   }, [setSelectedChainType, evmWallet, onClose])
 
-  const handleSolanaWalletSelect = useCallback((walletName: string) => {
+  const handleSolanaWalletSelect = useCallback(async (walletName: string) => {
     setSelectedChainType('solana')
-    solanaWallet.selectWallet(walletName)
+    await solanaWallet.selectWallet(walletName)
     onClose()
   }, [setSelectedChainType, solanaWallet, onClose])
 
@@ -50,7 +50,8 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
     
     const iconMap: Record<string, string> = {
       'metaMask': 'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
-      'walletConnect': 'https://explorer-api.walletconnect.com/v3/logo/lg/5195e9db-94d8-4579-6f11-ef553be95100?projectId=2f05ae7f1116030fde2d36508f472bfb',
+      'walletConnect': 'https://avatars.githubusercontent.com/u/37784886?s=200&v=4',
+      'walletConnectLegacy': 'https://avatars.githubusercontent.com/u/37784886?s=200&v=4',
       'coinbaseWallet': 'https://www.coinbase.com/img/favicon/favicon-256.png',
       'coinbaseWalletSDK': 'https://www.coinbase.com/img/favicon/favicon-256.png',
       'brave': 'https://brave.com/static-assets/images/brave-logo-sans-text.svg',
@@ -59,6 +60,8 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
     
     return iconMap[connector.id] || `https://api.dicebear.com/7.x/identicon/svg?seed=${connector.name}`
   }
+
+  const isSolanaMetamask = (walletName: string) => walletName.toLowerCase().includes('metamask')
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -163,11 +166,20 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                     className="wallet-option-btn"
                     onClick={() => handleSolanaWalletSelect(w.adapter.name)}
                   >
-                    <img 
-                      src={w.adapter.icon} 
-                      alt={w.adapter.name} 
-                      className="wallet-icon"
-                    />
+                    <span className={`wallet-icon-wrap ${isSolanaMetamask(w.adapter.name) ? 'has-solana-badge' : ''}`}>
+                      <img 
+                        src={w.adapter.icon} 
+                        alt={w.adapter.name} 
+                        className="wallet-icon"
+                      />
+                      {isSolanaMetamask(w.adapter.name) && (
+                        <img
+                          src="https://upload.wikimedia.org/wikipedia/en/b/b9/Solana_logo.png"
+                          alt="Solana"
+                          className="wallet-icon-badge wallet-icon-badge--solana"
+                        />
+                      )}
+                    </span>
                     <div className="wallet-option-info">
                       <span className="wallet-option-name">{w.adapter.name}</span>
                       <span className="wallet-option-desc wallet-detected">Detected</span>

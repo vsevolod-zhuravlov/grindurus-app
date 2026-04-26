@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { x402Client, wrapFetchWithPayment } from '@x402/fetch'
 import { registerExactEvmScheme } from '@x402/evm/exact/client'
+import { ExactSvmScheme } from '@x402/svm/exact/client'
+import { getBase64EncodedWireTransaction, getTransactionDecoder } from '@solana/kit'
+import { VersionedTransaction } from '@solana/web3.js'
+import { Buffer } from 'buffer'
 import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
+import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import './BacktestPage.css'
 
 const BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
@@ -40,6 +45,11 @@ type ApiQueueItem = {
   creator_address: string
 }
 
+type ApiHealth = {
+  status: string
+  backtest_price?: string
+}
+
 function shortenCreatorAddress(addr: string, head = 6, tail = 4) {
   const t = addr.trim()
   if (t.length <= head + tail + 1) return t
@@ -62,6 +72,14 @@ function toAmountString(value: string | number, fractionDigits = 8) {
     })
   }
   return String(value)
+}
+
+function normalizeUsdcAmount(raw: string | undefined, fallback = '1') {
+  if (!raw) return fallback
+  const cleaned = raw.replace(/^\$/, '').trim()
+  const n = Number(cleaned)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  return String(n)
 }
 
 const DEMO_BACKTEST_QUEUE: BacktestQueueItem[] = [
@@ -277,6 +295,8 @@ function BacktestPage() {
   const [queueColumns, setQueueColumns] = useState(4)
   const [queueBidValues, setQueueBidValues] = useState<Record<string, string>>({})
   const [queueBidCustomOpen, setQueueBidCustomOpen] = useState<Record<string, boolean>>({})
+  const [queueBidBusy, setQueueBidBusy] = useState<Record<string, boolean>>({})
+  const [defaultBidPrice, setDefaultBidPrice] = useState('1')
   const [queueItems, setQueueItems] = useState<BacktestQueueItem[]>([])
   const [queueSortBy, setQueueSortBy] = useState<'priority' | 'created_at'>('priority')
   const [queueLoading, setQueueLoading] = useState(false)
@@ -285,10 +305,24 @@ function BacktestPage() {
   const payMethodWrapRef = useRef<HTMLDivElement>(null)
   const queueScrollerRef = useRef<HTMLDivElement>(null)
   const { isConnected: isEvmConnected } = useAccount()
+  const solanaWallet = useSolanaWallet()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
   const { data: walletClient } = useWalletClient()
-  const walletNetwork = useMemo(() => (chainId ? `eip155:${chainId}` : null), [chainId])
+  const solanaWalletNetwork = useMemo(() => {
+    if (!solanaWallet.cluster) return null
+    if (solanaWallet.cluster === 'mainnet-beta') return 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
+    if (solanaWallet.cluster === 'testnet') return 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z'
+    return 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+  }, [solanaWallet.cluster])
+  const evmWalletNetwork = useMemo(() => (chainId ? `eip155:${chainId}` : null), [chainId])
+  const walletNetwork = useMemo(() => {
+    if (payMethod !== 'x402') return evmWalletNetwork
+    if (solanaWallet.isConnected && solanaWalletWalletSignerReady(solanaWallet.signTransaction)) {
+      return solanaWalletNetwork
+    }
+    return evmWalletNetwork
+  }, [evmWalletNetwork, payMethod, solanaWallet.isConnected, solanaWallet.signTransaction, solanaWalletNetwork])
 
   const quoteOptions = useMemo(
     () => QUOTE_ASSETS.filter((q) => !(baseAsset === 'SOL' && q === 'SOL')),
@@ -317,8 +351,8 @@ function BacktestPage() {
     setPaySuccess('')
     setAppliedPromocode('')
     setShowX402NetworkSwitch(false)
-    if (payMethod === 'x402' && !isEvmConnected) {
-      setPayError('Connect an EVM wallet to pay with x402.')
+    if (payMethod === 'x402' && !isEvmConnected && !solanaWallet.isConnected) {
+      setPayError('Connect an EVM or Solana wallet to pay with x402.')
       return
     }
     if (payMethod === 'x402' && !paidFetch) {
@@ -333,7 +367,7 @@ function BacktestPage() {
     try {
       const endpoint = `${backtestApiOrigin}/backtest`
       const body = JSON.stringify({
-        owner_address: '0x0000000000000000000000000000000000000001',
+        owner_address: solanaWallet.address || walletClient?.account?.address || '0x0000000000000000000000000000000000000001',
         params: {
           payment_method: payMethod,
           wallet_network: walletNetwork,
@@ -413,15 +447,54 @@ function BacktestPage() {
     setQueueBidValues((prev) => ({ ...prev, [id]: sanitizeDecimal(raw) }))
   }
 
-  const handleQueueBidSubmit = (id: string) => {
-    const value = (queueBidValues[id] ?? '').trim()
+  const handleQueueBidSubmit = async (id: string, explicitAmount?: string) => {
+    const value = (explicitAmount ?? queueBidValues[id] ?? '').trim()
     if (!value) return
-    setQueueBidValues((prev) => ({ ...prev, [id]: value }))
+    if (!paidFetch) {
+      setQueueError('Connect wallet to pay bid via x402.')
+      return
+    }
+    setQueueBidBusy((prev) => ({ ...prev, [id]: true }))
+    setQueueError('')
+    try {
+      const endpoint = `${backtestApiOrigin}/backtest/${id}/bid`
+      const response = await paidFetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Payment-Method': 'x402',
+          'X-Bid-Amount': value,
+          ...(walletNetwork ? { 'X-Wallet-Network': walletNetwork } : {}),
+        },
+        body: JSON.stringify({ amount_usdc: value }),
+      })
+      const rawText = await response.text()
+      let data: unknown = null
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText) as unknown
+        } catch {
+          data = rawText
+        }
+      }
+      if (!response.ok) {
+        throw new Error(formatBacktestApiError(data, response.status))
+      }
+      setQueueBidValues((prev) => ({ ...prev, [id]: '' }))
+      setQueueBidCustomOpen((prev) => ({ ...prev, [id]: false }))
+      await loadQueue()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to submit bid'
+      setQueueError(message)
+    } finally {
+      setQueueBidBusy((prev) => ({ ...prev, [id]: false }))
+    }
   }
 
   const handleQueueBidOneUsdc = (id: string) => {
-    setQueueBidValues((prev) => ({ ...prev, [id]: '1' }))
-    handleQueueBidSubmit(id)
+    const amount = defaultBidPrice
+    setQueueBidValues((prev) => ({ ...prev, [id]: amount }))
+    void handleQueueBidSubmit(id, amount)
   }
 
   const handleSwitchBase = () => {
@@ -445,21 +518,83 @@ function BacktestPage() {
     []
   )
   const paidFetch = useMemo(() => {
-    if (!walletClient?.account?.address) return null
-    const client = new x402Client()
-    registerExactEvmScheme(client, {
-      signer: {
-        address: walletClient.account.address,
-        signTypedData: (typedData: Parameters<typeof walletClient.signTypedData>[0]) =>
-          walletClient.signTypedData({
-            ...typedData,
-            account: walletClient.account,
-          }),
-      } as any,
-      ...(walletNetwork ? { networks: [walletNetwork] } : {}),
+    const hasEvmSigner = !!walletClient?.account?.address
+    const hasSvmSigner =
+      !!solanaWallet.address &&
+      solanaWallet.isConnected &&
+      solanaWalletWalletSignerReady(solanaWallet.signTransaction)
+    if (!hasEvmSigner && !hasSvmSigner) return null
+
+    // For x402, if Solana wallet is connected, force Solana scheme selection.
+    const preferSolanaForX402 = payMethod === 'x402' && hasSvmSigner
+    const client = new (x402Client as any)((_: number, accepts: Array<{ network?: string }>) => {
+      const byNetwork = (prefix: string) =>
+        accepts.filter((item) => typeof item.network === 'string' && item.network.startsWith(prefix))
+
+      if (preferSolanaForX402) {
+        if (walletNetwork?.startsWith('solana:')) {
+          const exactSolana = accepts.find((item) => item.network === walletNetwork)
+          if (exactSolana) return exactSolana
+        }
+        const solanaAccepts = byNetwork('solana:')
+        if (solanaAccepts.length > 0) return solanaAccepts[0]
+      }
+
+      if (walletNetwork?.startsWith('eip155:')) {
+        const exactEvm = accepts.find((item) => item.network === walletNetwork)
+        if (exactEvm) return exactEvm
+        const evmAccepts = byNetwork('eip155:')
+        if (evmAccepts.length > 0) return evmAccepts[0]
+      }
+
+      return accepts[0]
     })
+    if (!preferSolanaForX402 && hasEvmSigner && walletClient) {
+      registerExactEvmScheme(client, {
+        signer: {
+          address: walletClient.account.address,
+          signTypedData: (typedData: Parameters<typeof walletClient.signTypedData>[0]) =>
+            walletClient.signTypedData({
+              ...typedData,
+              account: walletClient.account,
+            }),
+        } as any,
+      })
+    }
+    if (hasSvmSigner && solanaWallet.address) {
+      const solanaSignTransaction = solanaWallet.signTransaction
+      const svmSigner = {
+        address: solanaWallet.address,
+        signTransactions: async (transactions: any[]) => {
+          const signatures = await Promise.all(
+            transactions.map(async (tx) => {
+              const base64Wire = getBase64EncodedWireTransaction(tx)
+              const web3Tx = VersionedTransaction.deserialize(Buffer.from(base64Wire, 'base64'))
+              const signedWeb3Tx = await solanaSignTransaction!(web3Tx as any)
+              const decodedSignedTx = getTransactionDecoder().decode(signedWeb3Tx.serialize())
+              return decodedSignedTx.signatures ?? {}
+            })
+          )
+          return signatures
+        },
+      }
+      // Prefer app-configured RPC endpoint to avoid wallet-internal endpoints
+      // that may not expose CORS for browser fetch.
+      const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || solanaWallet.rpcEndpoint
+      if (solanaWalletNetwork) {
+        ;(client as any).register(
+          solanaWalletNetwork,
+          new ExactSvmScheme(svmSigner as any, rpcUrl ? { rpcUrl } : undefined)
+        )
+      } else {
+        ;(client as any).register(
+          'solana:*',
+          new ExactSvmScheme(svmSigner as any, rpcUrl ? { rpcUrl } : undefined)
+        )
+      }
+    }
     return wrapFetchWithPayment(fetch, client)
-  }, [walletClient, walletNetwork])
+  }, [payMethod, solanaWallet.address, solanaWallet.isConnected, solanaWallet.rpcEndpoint, solanaWallet.signTransaction, solanaWalletNetwork, walletClient])
 
   const loadQueue = useCallback(
     async (signal?: AbortSignal) => {
@@ -516,6 +651,22 @@ function BacktestPage() {
   }, [loadQueue])
 
   useEffect(() => {
+    const ac = new AbortController()
+    const loadHealth = async () => {
+      try {
+        const response = await fetch(`${backtestApiOrigin}/health`, { signal: ac.signal })
+        if (!response.ok) return
+        const payload = (await response.json()) as ApiHealth
+        setDefaultBidPrice(normalizeUsdcAmount(payload.backtest_price, '1'))
+      } catch {
+        // Keep default "1" if health endpoint unavailable.
+      }
+    }
+    void loadHealth()
+    return () => ac.abort()
+  }, [backtestApiOrigin])
+
+  useEffect(() => {
     if (!quoteOptions.includes(quoteAsset)) {
       setQuoteAsset(quoteOptions[0])
     }
@@ -545,7 +696,7 @@ function BacktestPage() {
     if (!el) return
 
     const updateColumns = () => {
-      const cardMin = 168
+      const cardMin = 190
       const gap = 10
       const cols = Math.max(1, Math.floor((el.clientWidth + gap) / (cardMin + gap)))
       setQueueColumns(cols)
@@ -858,10 +1009,18 @@ function BacktestPage() {
                         return (
                           <div
                             key={item.id}
-                            className={`backtest-queue-item ${visualIdx < visualRow.length - 1 ? 'has-connector' : ''}`}
+                            className={`backtest-queue-item ${
+                              visualIdx > 0 ? 'has-connector' : ''
+                            } ${
+                              visualIdx === visualRow.length - 1 && rowIdx < queueRows.length - 1
+                                ? 'has-next-link'
+                                : ''
+                            }`}
                           >
                             <div
-                              className="backtest-queue-card"
+                              className={`backtest-queue-card ${
+                                originalIdx === 0 ? 'backtest-queue-card--leader' : ''
+                              }`}
                               title={`${item.base} / ${item.quote}, ${item.dateFrom} – ${item.dateTo}, ${item.baseAmount} ${item.base}, ${item.quoteAmount} ${item.quote}, ${item.creatorAddress}`}
                             >
                               <span className="backtest-queue-index">#{originalIdx + 1}</span>
@@ -907,7 +1066,7 @@ function BacktestPage() {
                                       className="backtest-queue-bid-btn"
                                       onClick={() => handleQueueBidOneUsdc(item.id)}
                                     >
-                                      BID 1 USDC
+                                      BID {defaultBidPrice} USDC
                                     </button>
                                     <button
                                       type="button"
@@ -943,7 +1102,7 @@ function BacktestPage() {
                                             onKeyDown={(e) => {
                                               if (e.key === 'Enter') {
                                                 e.preventDefault()
-                                                handleQueueBidSubmit(item.id)
+                                                void handleQueueBidSubmit(item.id)
                                               }
                                             }}
                                             aria-label={`Bid amount for queue item #${originalIdx + 1}`}
@@ -953,10 +1112,13 @@ function BacktestPage() {
                                         <button
                                           type="button"
                                           className="backtest-queue-bid-btn"
-                                          onClick={() => handleQueueBidSubmit(item.id)}
-                                          disabled={!(queueBidValues[item.id] ?? '').trim()}
+                                          onClick={() => void handleQueueBidSubmit(item.id)}
+                                          disabled={
+                                            !(queueBidValues[item.id] ?? '').trim() ||
+                                            !!queueBidBusy[item.id]
+                                          }
                                         >
-                                          BID
+                                          {queueBidBusy[item.id] ? 'BIDDING…' : 'BID'}
                                         </button>
                                       </div>
                                     </div>
@@ -994,7 +1156,7 @@ function BacktestPage() {
               className="backtest-placeholder-chart"
               viewBox="0 0 100 42"
               role="img"
-              aria-label="Upward pink equity curve"
+              aria-label="Candlestick chart preview"
               preserveAspectRatio="none"
             >
               <defs>
@@ -1008,14 +1170,46 @@ function BacktestPage() {
                 <line x1="0" y1="20" x2="100" y2="20" />
                 <line x1="0" y1="30" x2="100" y2="30" />
               </g>
-              <path
-                className="backtest-placeholder-area"
-                d="M2 36 L2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6 L98 36 Z"
-              />
-              <path
-                className="backtest-placeholder-line"
-                d="M2 31 L10 32 L18 29 L26 27 L34 28 L42 24 L50 22 L58 19 L66 17 L74 14 L82 12 L90 9 L98 6"
-              />
+              <g className="backtest-placeholder-candles">
+                <line x1="8" y1="31" x2="8" y2="20" className="backtest-candle-wick is-up" />
+                <rect x="6.8" y="24" width="2.4" height="7" className="backtest-candle-body is-up" />
+
+                <line x1="15" y1="30" x2="15" y2="18" className="backtest-candle-wick is-up" />
+                <rect x="13.8" y="22" width="2.4" height="8" className="backtest-candle-body is-up" />
+
+                <line x1="22" y1="27" x2="22" y2="16" className="backtest-candle-wick is-up" />
+                <rect x="20.8" y="19" width="2.4" height="8" className="backtest-candle-body is-up" />
+
+                <line x1="29" y1="26" x2="29" y2="15" className="backtest-candle-wick is-down" />
+                <rect x="27.8" y="19" width="2.4" height="5" className="backtest-candle-body is-down" />
+
+                <line x1="36" y1="24" x2="36" y2="12" className="backtest-candle-wick is-up" />
+                <rect x="34.8" y="16" width="2.4" height="7" className="backtest-candle-body is-up" />
+
+                <line x1="43" y1="23" x2="43" y2="11" className="backtest-candle-wick is-up" />
+                <rect x="41.8" y="14" width="2.4" height="8" className="backtest-candle-body is-up" />
+
+                <line x1="50" y1="21" x2="50" y2="9" className="backtest-candle-wick is-up" />
+                <rect x="48.8" y="12.5" width="2.4" height="8.5" className="backtest-candle-body is-up" />
+
+                <line x1="57" y1="20" x2="57" y2="8.5" className="backtest-candle-wick is-down" />
+                <rect x="55.8" y="12" width="2.4" height="6" className="backtest-candle-body is-down" />
+
+                <line x1="64" y1="18" x2="64" y2="7.5" className="backtest-candle-wick is-up" />
+                <rect x="62.8" y="10.5" width="2.4" height="6.5" className="backtest-candle-body is-up" />
+
+                <line x1="71" y1="16.5" x2="71" y2="6.2" className="backtest-candle-wick is-up" />
+                <rect x="69.8" y="9.5" width="2.4" height="6.2" className="backtest-candle-body is-up" />
+
+                <line x1="78" y1="15.2" x2="78" y2="5.8" className="backtest-candle-wick is-up" />
+                <rect x="76.8" y="8.3" width="2.4" height="5.8" className="backtest-candle-body is-up" />
+
+                <line x1="85" y1="14.4" x2="85" y2="5.2" className="backtest-candle-wick is-down" />
+                <rect x="83.8" y="8.2" width="2.4" height="4.7" className="backtest-candle-body is-down" />
+
+                <line x1="92" y1="13.2" x2="92" y2="4.8" className="backtest-candle-wick is-up" />
+                <rect x="90.8" y="7.2" width="2.4" height="5.2" className="backtest-candle-body is-up" />
+              </g>
             </svg>
           </div>
         </section>
@@ -1025,3 +1219,9 @@ function BacktestPage() {
 }
 
 export default BacktestPage
+
+function solanaWalletWalletSignerReady(
+  signTransaction: unknown
+): signTransaction is (tx: unknown) => Promise<{ serialize: () => Uint8Array }> {
+  return typeof signTransaction === 'function'
+}
