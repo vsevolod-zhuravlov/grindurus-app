@@ -103,8 +103,14 @@ export function useSolanaWallet() {
   }, [setVisible])
 
   const disconnect = useCallback(async () => {
-    await walletDisconnect()
-  }, [walletDisconnect])
+    try {
+      await walletDisconnect()
+    } finally {
+      // Prevent wallet-adapter autoConnect from immediately reconnecting
+      // after manual disconnect (even if disconnect throws).
+      select(null)
+    }
+  }, [select, walletDisconnect])
 
   const switchCluster = useCallback(
     (cluster: 'mainnet-beta' | 'testnet' | 'devnet') => {

@@ -10,7 +10,7 @@ export interface ActiveWalletState {
   shortAddress: string
   chainType: ChainType
   networkName: string
-  disconnect: () => void
+  disconnect: () => Promise<void>
 }
 
 export function useActiveWallet(): ActiveWalletState {
@@ -27,8 +27,8 @@ export function useActiveWallet(): ActiveWalletState {
         shortAddress: evmWallet.shortAddress,
         chainType: 'evm',
         networkName: evmWallet.chainName,
-        disconnect: () => {
-          evmWallet.disconnect()
+        disconnect: async () => {
+          await Promise.resolve(evmWallet.disconnect())
           contextDisconnect()
         },
       }
@@ -42,8 +42,8 @@ export function useActiveWallet(): ActiveWalletState {
         shortAddress: solanaWallet.shortAddress,
         chainType: 'solana',
         networkName: solanaWallet.clusterName,
-        disconnect: () => {
-          void solanaWallet.disconnect()
+        disconnect: async () => {
+          await solanaWallet.disconnect()
           contextDisconnect()
         },
       }
@@ -56,7 +56,7 @@ export function useActiveWallet(): ActiveWalletState {
       shortAddress: '',
       chainType: null,
       networkName: '',
-      disconnect: () => {},
+      disconnect: async () => {},
     }
   }, [selectedChainType, evmWallet, solanaWallet, contextDisconnect])
 

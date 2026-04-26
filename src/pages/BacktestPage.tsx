@@ -7,6 +7,7 @@ import { VersionedTransaction } from '@solana/web3.js'
 import { Buffer } from 'buffer'
 import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
+import { ChainSelectorModal } from '../components/ChainSelectorModal'
 import './BacktestPage.css'
 
 const BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
@@ -326,6 +327,7 @@ function BacktestPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
   const [showX402NetworkSwitch, setShowX402NetworkSwitch] = useState(false)
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const payMethodWrapRef = useRef<HTMLDivElement>(null)
   const queueScrollerRef = useRef<HTMLDivElement>(null)
   const { isConnected: isEvmConnected } = useAccount()
@@ -442,6 +444,21 @@ function BacktestPage() {
       await loadQueue()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to enqueue backtest'
+      const lowerMessage = message.toLowerCase()
+      const isUserRejectedSignature =
+        lowerMessage.includes('user rejected') ||
+        lowerMessage.includes('user denied') ||
+        lowerMessage.includes('request rejected') ||
+        lowerMessage.includes('rejected the request') ||
+        lowerMessage.includes('signature rejected') ||
+        lowerMessage.includes('transaction rejected') ||
+        lowerMessage.includes('cancelled')
+
+      if (payMethod === 'x402' && isUserRejectedSignature) {
+        setPayError('Signature request was cancelled.')
+        return
+      }
+
       if (
         payMethod === 'x402' &&
         (message.includes('No scheme registered') ||
@@ -536,17 +553,32 @@ function BacktestPage() {
   }
 
   const quoteValue = quoteOptions.includes(quoteAsset) ? quoteAsset : quoteOptions[0]
+  const hasEvmSigner = isEvmConnected && !!walletClient?.account?.address
+  const hasSvmSigner =
+    !!solanaWallet.address &&
+    solanaWallet.isConnected &&
+    solanaWalletWalletSignerReady(solanaWallet.signTransaction)
+  const x402NeedsWalletConnection =
+    payMethod === 'x402' && !hasEvmSigner && !hasSvmSigner
+  const payButtonLabel =
+    x402NeedsWalletConnection
+      ? 'Connect wallet'
+      : payMethod === 'promocode'
+      ? 'Queue backtest'
+      : `Pay 1 ${quoteValue}`
+  const payButtonAriaLabel = payBusy
+    ? 'Processing payment'
+    : x402NeedsWalletConnection
+      ? 'Connect wallet to pay with x402'
+      : payMethod === 'promocode'
+      ? 'Run backtest with promocode'
+      : `Pay 1 ${quoteValue} and run backtest`
 
   const backtestApiOrigin = useMemo(
     () => (import.meta.env.VITE_BACKTEST_API_URL ?? 'http://localhost:8001').replace(/\/$/, ''),
     []
   )
   const paidFetch = useMemo(() => {
-    const hasEvmSigner = !!walletClient?.account?.address
-    const hasSvmSigner =
-      !!solanaWallet.address &&
-      solanaWallet.isConnected &&
-      solanaWalletWalletSignerReady(solanaWallet.signTransaction)
     if (!hasEvmSigner && !hasSvmSigner) return null
 
     // For x402, if Solana wallet is connected, force Solana scheme selection.
@@ -779,6 +811,33 @@ function BacktestPage() {
   }, [])
 
   const visibleQueue = queueItems
+  const queuePriorityRaw = useMemo(
+    () => visibleQueue.reduce((acc, item) => acc + Number(item.usdcPaid || 0), 0),
+    [visibleQueue]
+  )
+  const stackPriorityRaw = useMemo(
+    () => historyItems.reduce((acc, item) => acc + Number(item.pnlQuote || 0), 0),
+    [historyItems]
+  )
+  const totalPriorityRaw = useMemo(() => queuePriorityRaw + stackPriorityRaw, [queuePriorityRaw, stackPriorityRaw])
+  const formatUsdc = (value: number) =>
+    Number.isFinite(value)
+      ? value.toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })
+      : '0'
+  const totalPaymentsUsdc = useMemo(() => formatUsdc(totalPriorityRaw), [totalPriorityRaw])
+  const queuePriorityUsdc = useMemo(() => formatUsdc(queuePriorityRaw), [queuePriorityRaw])
+  const stackPriorityUsdc = useMemo(() => formatUsdc(stackPriorityRaw), [stackPriorityRaw])
+  const queuePriorityPct = useMemo(
+    () => (totalPriorityRaw > 0 ? (queuePriorityRaw / totalPriorityRaw) * 100 : 0),
+    [queuePriorityRaw, totalPriorityRaw]
+  )
+  const stackPriorityPct = useMemo(
+    () => (totalPriorityRaw > 0 ? (stackPriorityRaw / totalPriorityRaw) * 100 : 0),
+    [stackPriorityRaw, totalPriorityRaw]
+  )
   const queueRows = useMemo(() => chunkArray(visibleQueue, queueColumns), [visibleQueue, queueColumns])
   const featuredBacktest = visibleQueue[0] ?? DEMO_BACKTEST_QUEUE[0]
   const featuredRangeDays = useMemo(
@@ -790,10 +849,8 @@ function BacktestPage() {
     <div className="backtest-page">
       <div className="backtest-layout">
         <div className="backtest-panel-wrap">
-          <h2 id="backtest-panel-title" className="backtest-panel-title">
-            Create backtest
-          </h2>
-          <aside className="backtest-panel" aria-labelledby="backtest-panel-title">
+          <aside className="backtest-panel">
+          <p className="backtest-panel-heading">Create backtest</p>
 
           <div className="backtest-field">
             <div className="backtest-dates" role="group" aria-label="Backtest date range">
@@ -849,9 +906,6 @@ function BacktestPage() {
                     </option>
                   ))}
                 </select>
-                <label className="backtest-sublabel backtest-sublabel--small" htmlFor="backtest-base-amt">
-                  Backtest amount
-                </label>
                 <div className="backtest-amount-with-suffix">
                   <input
                     id="backtest-base-amt"
@@ -882,9 +936,6 @@ function BacktestPage() {
                     </option>
                   ))}
                 </select>
-                <label className="backtest-sublabel backtest-sublabel--small" htmlFor="backtest-quote-amt">
-                  Backtest amount
-                </label>
                 <div className="backtest-amount-with-suffix">
                   <input
                     id="backtest-quote-amt"
@@ -909,11 +960,18 @@ function BacktestPage() {
                   <button
                     type="button"
                     className="backtest-pay-btn"
-                    onClick={handlePay}
+                    onClick={() => {
+                      if (x402NeedsWalletConnection) {
+                        setPayError('')
+                        setIsWalletModalOpen(true)
+                        return
+                      }
+                      void handlePay()
+                    }}
                     disabled={payBusy}
-                    aria-label={payBusy ? 'Processing payment' : `Pay 1 ${quoteValue} and run backtest`}
+                    aria-label={payButtonAriaLabel}
                   >
-                    {payBusy ? 'Processing…' : `Pay 1 ${quoteValue}`}
+                    {payBusy ? 'Processing…' : payButtonLabel}
                   </button>
                   <div className="backtest-pay-method-wrap">
                     <span className="backtest-pay-method-caption">Payment method</span>
@@ -936,74 +994,74 @@ function BacktestPage() {
                         ▾
                       </span>
                     </button>
-                  </div>
-                </div>
-                {payMethod === 'promocode' && (
-                  <div className="backtest-promocode-inline-wrap">
-                    <div className="backtest-promocode-inline">
-                      <input
-                        id="backtest-promocode-inline"
-                        type="text"
-                        className="backtest-promo-input"
-                        value={promocode}
-                        onChange={(e) => {
-                          setPromocode(e.target.value)
-                          setAppliedPromocode('')
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && promocode.trim()) {
-                            e.preventDefault()
-                            handlePromoApply()
-                          }
-                        }}
-                        placeholder="Enter promocode"
-                        autoComplete="off"
-                        spellCheck={false}
-                        aria-label="Promocode"
-                      />
-                      <button
-                        type="button"
-                        className="backtest-promo-apply"
-                        onClick={handlePromoApply}
-                        disabled={!promocode.trim()}
+                    {payMethod === 'promocode' && (
+                      <div className="backtest-promocode-inline-wrap backtest-promocode-inline-wrap--in-actions">
+                        <div className="backtest-promocode-inline">
+                          <input
+                            id="backtest-promocode-inline"
+                            type="text"
+                            className="backtest-promo-input"
+                            value={promocode}
+                            onChange={(e) => {
+                              setPromocode(e.target.value)
+                              setAppliedPromocode('')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && promocode.trim()) {
+                                e.preventDefault()
+                                handlePromoApply()
+                              }
+                            }}
+                            placeholder="Enter promocode"
+                            autoComplete="off"
+                            spellCheck={false}
+                            aria-label="Promocode"
+                          />
+                          <button
+                            type="button"
+                            className="backtest-promo-apply"
+                            onClick={handlePromoApply}
+                            disabled={!promocode.trim()}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                        {appliedPromocode && (
+                          <p className="backtest-promocode-inline-status" aria-live="polite">
+                            Promocode applied. Now click Pay 1 {quoteValue}.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {payMenuOpen && (
+                      <div
+                        className="backtest-pay-method-list"
+                        role="listbox"
+                        aria-label="Payment method"
                       >
-                        Apply
-                      </button>
-                    </div>
-                    {appliedPromocode && (
-                      <p className="backtest-promocode-inline-status" aria-live="polite">
-                        Promocode applied. Now click Pay 1 {quoteValue}.
-                      </p>
+                        {PAY_METHODS.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            role="option"
+                            aria-selected={payMethod === m}
+                            className={`backtest-pay-method-list-item ${
+                              payMethod === m ? 'is-active' : ''
+                            }`}
+                            onClick={() => {
+                              setPayMethod(m)
+                              setPayError('')
+                              setPaySuccess('')
+                              setPayMenuOpen(false)
+                            }}
+                          >
+                            {PAY_METHOD_LABEL[m]}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                )}
-                {payMenuOpen && (
-                  <div
-                    className="backtest-pay-method-list"
-                    role="listbox"
-                    aria-label="Payment method"
-                  >
-                    {PAY_METHODS.map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        role="option"
-                        aria-selected={payMethod === m}
-                        className={`backtest-pay-method-list-item ${
-                          payMethod === m ? 'is-active' : ''
-                        }`}
-                        onClick={() => {
-                          setPayMethod(m)
-                          setPayError('')
-                          setPaySuccess('')
-                          setPayMenuOpen(false)
-                        }}
-                      >
-                        {PAY_METHOD_LABEL[m]}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                </div>
               </div>
             </div>
             {(payError || paySuccess) && (
@@ -1024,6 +1082,44 @@ function BacktestPage() {
             )}
           </div>
           </aside>
+          <section className="backtest-payments-summary" aria-label="Payments summary">
+            <div className="backtest-payments-summary-head">
+              <span className="backtest-payments-summary-title">Total priority</span>
+              <span className="backtest-payments-summary-value">{totalPaymentsUsdc} USDC</span>
+            </div>
+            <div className="backtest-payments-infographic">
+              <div className="backtest-payments-bar" aria-hidden="true">
+                <span
+                  className="backtest-payments-bar-segment is-queue"
+                  style={{ width: `${queuePriorityPct}%` }}
+                />
+                <span
+                  className="backtest-payments-bar-segment is-stack"
+                  style={{ width: `${stackPriorityPct}%` }}
+                />
+              </div>
+              <div className="backtest-payments-priority-lines">
+                <span className="backtest-payments-priority-line">
+                  <span className="backtest-payments-priority-label">
+                    <span className="backtest-payments-dot is-queue" aria-hidden="true" />
+                    queue priority
+                  </span>
+                  <span className="backtest-payments-priority-amount">
+                    {queuePriorityUsdc} USDC ({queuePriorityPct.toFixed(1)}%)
+                  </span>
+                </span>
+                <span className="backtest-payments-priority-line">
+                  <span className="backtest-payments-priority-label">
+                    <span className="backtest-payments-dot is-stack" aria-hidden="true" />
+                    stack priority
+                  </span>
+                  <span className="backtest-payments-priority-amount">
+                    {stackPriorityUsdc} USDC ({stackPriorityPct.toFixed(1)}%)
+                  </span>
+                </span>
+              </div>
+            </div>
+          </section>
           <section className="backtest-main" aria-label="Backtest results">
           <div
             className="backtest-queue-wrap"
@@ -1038,7 +1134,7 @@ function BacktestPage() {
                 className={`backtest-queue-view-btn ${queueView === 'queue' ? 'is-active' : ''}`}
                 onClick={() => setQueueView('queue')}
               >
-                Queue
+                queue
               </button>
               <button
                 type="button"
@@ -1047,36 +1143,40 @@ function BacktestPage() {
                 className={`backtest-queue-view-btn ${queueView === 'history' ? 'is-active' : ''}`}
                 onClick={() => setQueueView('history')}
               >
-                History PnL
+                stack
               </button>
             </div>
             <div className="backtest-queue-head">
               <p id="backtest-queue-label" className="backtest-queue-label">
-                {queueView === 'queue' ? 'Backtest queue' : 'Backtest history PnL'}
+                {queueView === 'queue' ? 'Backtests Queue' : 'Backtests Stack'}
               </p>
-              {queueView === 'queue' && (
-                <div className="backtest-queue-sort" aria-label="Queue sorting">
-                  <span className="backtest-queue-sort-label">Sort by:</span>
-                  <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
-                    <button
-                      type="button"
-                      className={`backtest-queue-sort-btn ${queueSortBy === 'priority' ? 'is-active' : ''}`}
-                      onClick={() => setQueueSortBy('priority')}
-                      aria-pressed={queueSortBy === 'priority'}
-                    >
-                      Priority
-                    </button>
-                    <button
-                      type="button"
-                      className={`backtest-queue-sort-btn ${queueSortBy === 'created_at' ? 'is-active' : ''}`}
-                      onClick={() => setQueueSortBy('created_at')}
-                      aria-pressed={queueSortBy === 'created_at'}
-                    >
-                      Date
-                    </button>
-                  </div>
+              <div
+                className={`backtest-queue-sort ${queueView === 'queue' ? '' : 'is-hidden'}`}
+                aria-label="Queue sorting"
+                aria-hidden={queueView !== 'queue'}
+              >
+                <span className="backtest-queue-sort-label">Sort by:</span>
+                <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
+                  <button
+                    type="button"
+                    className={`backtest-queue-sort-btn ${queueSortBy === 'priority' ? 'is-active' : ''}`}
+                    onClick={() => setQueueSortBy('priority')}
+                    aria-pressed={queueSortBy === 'priority'}
+                    tabIndex={queueView === 'queue' ? 0 : -1}
+                  >
+                    Priority
+                  </button>
+                  <button
+                    type="button"
+                    className={`backtest-queue-sort-btn ${queueSortBy === 'created_at' ? 'is-active' : ''}`}
+                    onClick={() => setQueueSortBy('created_at')}
+                    aria-pressed={queueSortBy === 'created_at'}
+                    tabIndex={queueView === 'queue' ? 0 : -1}
+                  >
+                    Date
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
             {queueView === 'queue' ? (
               <div
@@ -1086,10 +1186,16 @@ function BacktestPage() {
                 tabIndex={0}
                 aria-label="Scroll horizontally to browse the backtest queue"
               >
-                <div className="backtest-queue-grid-rows" role="list">
+                <div
+                  className={`backtest-queue-grid-rows ${
+                    queueSortBy === 'created_at' ? 'is-no-connectors' : ''
+                  }`}
+                  role="list"
+                >
                   {queueRows.map((row, rowIdx) => {
                     const isReverse = rowIdx % 2 === 1
                     const visualRow = row
+                    const showConnectors = queueSortBy !== 'created_at'
                     return (
                       <div
                         key={`queue-row-${rowIdx}`}
@@ -1104,9 +1210,11 @@ function BacktestPage() {
                             <div
                               key={item.id}
                               className={`backtest-queue-item ${
-                                visualIdx > 0 ? 'has-connector' : ''
+                              showConnectors && visualIdx > 0 ? 'has-connector' : ''
                               } ${
-                                visualIdx === visualRow.length - 1 && rowIdx < queueRows.length - 1
+                              showConnectors &&
+                              visualIdx === visualRow.length - 1 &&
+                              rowIdx < queueRows.length - 1
                                   ? 'has-next-link'
                                   : ''
                               }`}
@@ -1340,6 +1448,10 @@ function BacktestPage() {
           </div>
         </section>
       </div>
+      <ChainSelectorModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+      />
     </div>
   )
 }

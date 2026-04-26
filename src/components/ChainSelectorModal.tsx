@@ -14,6 +14,7 @@ interface ChainSelectorModalProps {
 
 export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('evm')
+  const [evmConnectError, setEvmConnectError] = useState('')
   const { setSelectedChainType } = useWalletContext()
   const evmWallet = useEvmWallet()
   const solanaWallet = useSolanaWallet()
@@ -33,17 +34,34 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
     }
   }, [isOpen])
 
-  const handleEvmConnectorSelect = useCallback((connectorId: string) => {
-    setSelectedChainType('evm')
-    evmWallet.connectWithConnector(connectorId)
-    onClose()
-  }, [setSelectedChainType, evmWallet, onClose])
+  const handleEvmConnectorSelect = useCallback(
+    async (connectorId: string) => {
+      setEvmConnectError('')
+      setSelectedChainType('evm')
+      try {
+        await evmWallet.connectWithConnector(connectorId)
+        onClose()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!message.toLowerCase().includes('user rejected')) {
+          setEvmConnectError('WalletConnect failed. Check WalletConnect Project ID and try again.')
+        }
+      }
+    },
+    [setSelectedChainType, evmWallet, onClose]
+  )
 
   const handleSolanaWalletSelect = useCallback(async (walletName: string) => {
     setSelectedChainType('solana')
     await solanaWallet.selectWallet(walletName)
     onClose()
   }, [setSelectedChainType, solanaWallet, onClose])
+
+  const handleWalletConnectFallback = useCallback(() => {
+    setSelectedChainType('evm')
+    evmWallet.connect()
+    onClose()
+  }, [setSelectedChainType, evmWallet, onClose])
 
   const getConnectorIcon = (connector: { id: string; name: string; icon?: string }) => {
     if (connector.icon) return connector.icon
@@ -133,10 +151,12 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             <div className="wallet-options">
               {evmWallet.connectors.length > 0 ? (
                 evmWallet.connectors.map((connector) => (
-                  <button 
+                  <button
                     key={connector.uid} 
                     className="wallet-option-btn"
-                    onClick={() => handleEvmConnectorSelect(connector.uid)}
+                    onClick={() => {
+                      void handleEvmConnectorSelect(connector.uid)
+                    }}
                   >
                     <img 
                       src={getConnectorIcon(connector)} 
@@ -152,9 +172,27 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
               ) : (
                 <div className="no-wallets-message">
                   <p>No EVM wallets detected</p>
-                  <p className="no-wallets-hint">Install MetaMask or another EVM wallet to continue</p>
+                  <p className="no-wallets-hint">
+                    Install MetaMask or use WalletConnect (Rainbow) to continue
+                  </p>
+                  <button
+                    type="button"
+                    className="wallet-option-btn wallet-option-btn--walletconnect"
+                    onClick={handleWalletConnectFallback}
+                  >
+                    <img
+                      src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4"
+                      alt="WalletConnect"
+                      className="wallet-icon"
+                    />
+                    <div className="wallet-option-info">
+                      <span className="wallet-option-name">WalletConnect (Rainbow)</span>
+                      <span className="wallet-option-desc wallet-detected">Open QR modal</span>
+                    </div>
+                  </button>
                 </div>
               )}
+              {evmConnectError && <p className="wallet-evm-error">{evmConnectError}</p>}
             </div>
           )}
           {activeTab === 'solana' && (
