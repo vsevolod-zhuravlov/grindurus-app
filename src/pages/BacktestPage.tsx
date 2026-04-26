@@ -45,6 +45,26 @@ type ApiQueueItem = {
   creator_address: string
 }
 
+type ApiHistoryItem = {
+  id: string
+  base_asset: string
+  quote_asset: string
+  period_start: string
+  period_end: string
+  pnl_base: string | number
+  pnl_quote: string | number
+  creator_address: string
+}
+
+type BacktestHistoryItem = {
+  id: string
+  pair: string
+  period: string
+  pnlBase: string
+  pnlQuote: string
+  creatorAddress: string
+}
+
 type ApiHealth = {
   status: string
   backtest_price?: string
@@ -299,8 +319,12 @@ function BacktestPage() {
   const [defaultBidPrice, setDefaultBidPrice] = useState('1')
   const [queueItems, setQueueItems] = useState<BacktestQueueItem[]>([])
   const [queueSortBy, setQueueSortBy] = useState<'priority' | 'created_at'>('priority')
+  const [queueView, setQueueView] = useState<'queue' | 'history'>('queue')
   const [queueLoading, setQueueLoading] = useState(false)
   const [queueError, setQueueError] = useState('')
+  const [historyItems, setHistoryItems] = useState<BacktestHistoryItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
   const [showX402NetworkSwitch, setShowX402NetworkSwitch] = useState(false)
   const payMethodWrapRef = useRef<HTMLDivElement>(null)
   const queueScrollerRef = useRef<HTMLDivElement>(null)
@@ -644,11 +668,58 @@ function BacktestPage() {
     [backtestApiOrigin, queueSortBy]
   )
 
+  const loadHistory = useCallback(
+    async (signal?: AbortSignal) => {
+      setHistoryLoading(true)
+      setHistoryError('')
+      try {
+        const response = await fetch(`${backtestApiOrigin}/history?limit=200`, { signal })
+        const raw = await response.text()
+        const payload = raw ? (JSON.parse(raw) as unknown) : []
+        if (!response.ok) {
+          throw new Error(`History request failed with status ${response.status}`)
+        }
+        if (!Array.isArray(payload)) {
+          throw new Error('History response is not an array')
+        }
+        const mapped = payload.map((item) => {
+          const h = item as ApiHistoryItem
+          return {
+            id: String(h.id),
+            pair: `${h.base_asset} / ${h.quote_asset}`,
+            period: `${toDateOnly(h.period_start)} - ${toDateOnly(h.period_end)}`,
+            pnlBase: toAmountString(h.pnl_base),
+            pnlQuote: toAmountString(h.pnl_quote),
+            creatorAddress: h.creator_address,
+          } satisfies BacktestHistoryItem
+        })
+        if (signal?.aborted) return
+        setHistoryItems(mapped)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted) return
+        const message = err instanceof Error ? err.message : 'Failed to load history'
+        setHistoryError(message)
+        setHistoryItems([])
+      } finally {
+        setHistoryLoading(false)
+      }
+    },
+    [backtestApiOrigin]
+  )
+
   useEffect(() => {
     const ac = new AbortController()
     void loadQueue(ac.signal)
     return () => ac.abort()
   }, [loadQueue])
+
+  useEffect(() => {
+    if (queueView !== 'history') return
+    const ac = new AbortController()
+    void loadHistory(ac.signal)
+    return () => ac.abort()
+  }, [loadHistory, queueView])
 
   useEffect(() => {
     const ac = new AbortController()
@@ -959,70 +1030,93 @@ function BacktestPage() {
             role="region"
             aria-labelledby="backtest-queue-label"
           >
+            <div className="backtest-queue-view-switch" role="tablist" aria-label="Queue data view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={queueView === 'queue'}
+                className={`backtest-queue-view-btn ${queueView === 'queue' ? 'is-active' : ''}`}
+                onClick={() => setQueueView('queue')}
+              >
+                Queue
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={queueView === 'history'}
+                className={`backtest-queue-view-btn ${queueView === 'history' ? 'is-active' : ''}`}
+                onClick={() => setQueueView('history')}
+              >
+                History PnL
+              </button>
+            </div>
             <div className="backtest-queue-head">
               <p id="backtest-queue-label" className="backtest-queue-label">
-                Backtest queue
+                {queueView === 'queue' ? 'Backtest queue' : 'Backtest history PnL'}
               </p>
-              <div className="backtest-queue-sort" aria-label="Queue sorting">
-                <span className="backtest-queue-sort-label">Sort by:</span>
-                <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
-                  <button
-                    type="button"
-                    className={`backtest-queue-sort-btn ${queueSortBy === 'priority' ? 'is-active' : ''}`}
-                    onClick={() => setQueueSortBy('priority')}
-                    aria-pressed={queueSortBy === 'priority'}
-                  >
-                    Priority
-                  </button>
-                  <button
-                    type="button"
-                    className={`backtest-queue-sort-btn ${queueSortBy === 'created_at' ? 'is-active' : ''}`}
-                    onClick={() => setQueueSortBy('created_at')}
-                    aria-pressed={queueSortBy === 'created_at'}
-                  >
-                    Date
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div
-              id="backtest-queue-scroller"
-              className="backtest-queue-scroller is-extended"
-              ref={queueScrollerRef}
-              tabIndex={0}
-              aria-label="Scroll horizontally to browse the backtest queue"
-            >
-              <div className="backtest-queue-grid-rows" role="list">
-                {queueRows.map((row, rowIdx) => {
-                  const isReverse = rowIdx % 2 === 1
-                  const visualRow = row
-                  return (
-                    <div
-                      key={`queue-row-${rowIdx}`}
-                      className={`backtest-queue-grid-row ${isReverse ? 'is-reverse' : ''} ${
-                        rowIdx < queueRows.length - 1 ? 'has-next' : ''
-                      }`}
-                      role="listitem"
+              {queueView === 'queue' && (
+                <div className="backtest-queue-sort" aria-label="Queue sorting">
+                  <span className="backtest-queue-sort-label">Sort by:</span>
+                  <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
+                    <button
+                      type="button"
+                      className={`backtest-queue-sort-btn ${queueSortBy === 'priority' ? 'is-active' : ''}`}
+                      onClick={() => setQueueSortBy('priority')}
+                      aria-pressed={queueSortBy === 'priority'}
                     >
-                      {visualRow.map((item, visualIdx) => {
-                        const originalIdx = visibleQueue.findIndex((q) => q.id === item.id)
-                        return (
-                          <div
-                            key={item.id}
-                            className={`backtest-queue-item ${
-                              visualIdx > 0 ? 'has-connector' : ''
-                            } ${
-                              visualIdx === visualRow.length - 1 && rowIdx < queueRows.length - 1
-                                ? 'has-next-link'
-                                : ''
-                            }`}
-                          >
+                      Priority
+                    </button>
+                    <button
+                      type="button"
+                      className={`backtest-queue-sort-btn ${queueSortBy === 'created_at' ? 'is-active' : ''}`}
+                      onClick={() => setQueueSortBy('created_at')}
+                      aria-pressed={queueSortBy === 'created_at'}
+                    >
+                      Date
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {queueView === 'queue' ? (
+              <div
+                id="backtest-queue-scroller"
+                className="backtest-queue-scroller is-extended"
+                ref={queueScrollerRef}
+                tabIndex={0}
+                aria-label="Scroll horizontally to browse the backtest queue"
+              >
+                <div className="backtest-queue-grid-rows" role="list">
+                  {queueRows.map((row, rowIdx) => {
+                    const isReverse = rowIdx % 2 === 1
+                    const visualRow = row
+                    return (
+                      <div
+                        key={`queue-row-${rowIdx}`}
+                        className={`backtest-queue-grid-row ${isReverse ? 'is-reverse' : ''} ${
+                          rowIdx < queueRows.length - 1 ? 'has-next' : ''
+                        }`}
+                        role="listitem"
+                      >
+                        {visualRow.map((item, visualIdx) => {
+                          const originalIdx = visibleQueue.findIndex((q) => q.id === item.id)
+                          return (
                             <div
-                              className={`backtest-queue-card ${
-                                originalIdx === 0 ? 'backtest-queue-card--leader' : ''
+                              key={item.id}
+                              className={`backtest-queue-item ${
+                                visualIdx > 0 ? 'has-connector' : ''
+                              } ${
+                                visualIdx === visualRow.length - 1 && rowIdx < queueRows.length - 1
+                                  ? 'has-next-link'
+                                  : ''
                               }`}
-                              title={`${item.base} / ${item.quote}, ${item.dateFrom} – ${item.dateTo}, ${item.baseAmount} ${item.base}, ${item.quoteAmount} ${item.quote}, ${item.creatorAddress}`}
                             >
+                              <div
+                                className={`backtest-queue-card ${
+                                  originalIdx === 0 ? 'backtest-queue-card--leader' : ''
+                                }`}
+                                title={`${item.base} / ${item.quote}, ${item.dateFrom} – ${item.dateTo}, ${item.baseAmount} ${item.base}, ${item.quoteAmount} ${item.quote}, ${item.creatorAddress}`}
+                              >
                               <span className="backtest-queue-index">#{originalIdx + 1}</span>
                               <span className="backtest-queue-pair">
                                 {item.base} / {item.quote}
@@ -1125,19 +1219,51 @@ function BacktestPage() {
                                   </>
                                 )}
                               </div>
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-            {queueLoading && <div className="backtest-queue-end-hint">Loading queue…</div>}
-            {!queueLoading && queueError && <div className="backtest-queue-end-hint">{queueError}</div>}
-            {!queueLoading && !queueError && visibleQueue.length === 0 && (
+            ) : (
+              <div className="backtest-history-list" aria-label="Backtest history PnL list">
+                {historyItems.map((item) => (
+                  <article key={item.id} className="backtest-history-card">
+                    <div className="backtest-history-main">
+                      <div className="backtest-history-pair">{item.pair}</div>
+                      <div className="backtest-history-period">{item.period}</div>
+                      <div className="backtest-history-creator" title={item.creatorAddress}>
+                        {shortenCreatorAddress(item.creatorAddress)}
+                      </div>
+                    </div>
+                    <div className="backtest-history-pnl">
+                      <div className="backtest-history-pnl-row">
+                        <span className="backtest-history-pnl-label">PnL base</span>
+                        <span className="backtest-history-pnl-value">{item.pnlBase}</span>
+                      </div>
+                      <div className="backtest-history-pnl-row">
+                        <span className="backtest-history-pnl-label">PnL quote</span>
+                        <span className="backtest-history-pnl-value">{item.pnlQuote}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {queueView === 'queue' && queueLoading && <div className="backtest-queue-end-hint">Loading queue…</div>}
+            {queueView === 'queue' && !queueLoading && queueError && <div className="backtest-queue-end-hint">{queueError}</div>}
+            {queueView === 'queue' && !queueLoading && !queueError && visibleQueue.length === 0 && (
               <div className="backtest-queue-end-hint">Queue is empty.</div>
+            )}
+            {queueView === 'history' && historyLoading && <div className="backtest-queue-end-hint">Loading history…</div>}
+            {queueView === 'history' && !historyLoading && historyError && (
+              <div className="backtest-queue-end-hint">{historyError}</div>
+            )}
+            {queueView === 'history' && !historyLoading && !historyError && historyItems.length === 0 && (
+              <div className="backtest-queue-end-hint">History is empty.</div>
             )}
           </div>
           </section>
