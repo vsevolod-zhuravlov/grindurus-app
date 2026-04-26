@@ -697,7 +697,7 @@
   z-index: 0;
   grid-column: 2;
   grid-row: 1 / span 2;
-  align-self: start;
+  align-self: stretch;
   width: 100%;
   min-width: 0;
   padding-top: 0;
@@ -1421,17 +1421,14 @@
   overflow: hidden;
 }
 
-.backtest-queue-card--leader::before {
-  content: '👑';
-  position: absolute;
-  left: 50%;
-  top: -0.92rem;
-  transform: translateX(-50%);
-  font-size: 1rem;
-  line-height: 1;
-  z-index: 3;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
-  pointer-events: none;
+.backtest-queue-card--second {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 105, 180, 0.18)),
+    var(--bg-secondary);
+  border-color: rgba(255, 105, 180, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 105, 180, 0.2),
+    0 0 14px rgba(255, 105, 180, 0.22);
 }
 
 .backtest-queue-card--leader::after {
@@ -1481,6 +1478,45 @@
   color: var(--text-secondary);
   letter-spacing: 0.03em;
   line-height: 1;
+}
+
+.backtest-queue-card--leader .backtest-queue-index {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.backtest-queue-card--leader .backtest-queue-index::before {
+  content: '👑';
+  font-size: 0.78rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.backtest-queue-index.is-second-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+}
+
+.backtest-queue-index.is-second-priority::before {
+  content: '🥈';
+  font-size: 0.7rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+.backtest-queue-index.is-third-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+}
+
+.backtest-queue-index.is-third-priority::before {
+  content: '🥉';
+  font-size: 0.7rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
 .backtest-queue-grid {
@@ -1647,6 +1683,42 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   cursor: pointer;
+}
+
+.backtest-queue-card--leader .backtest-queue-bid-btn {
+  border: 1px solid rgba(255, 105, 180, 0.72);
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.26), rgba(255, 20, 147, 0.16));
+  color: #ffe8f6;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 10px rgba(255, 105, 180, 0.22);
+}
+
+.backtest-queue-card--leader .backtest-queue-bid-btn.backtest-queue-bid-btn--secondary {
+  border-color: rgba(125, 255, 178, 0.5);
+  background: linear-gradient(135deg, rgba(125, 255, 178, 0.2), rgba(92, 234, 255, 0.12));
+  color: #d9fff0;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 10px rgba(125, 255, 178, 0.16);
+}
+
+.backtest-queue-card--second .backtest-queue-bid-btn {
+  border: 1px solid rgba(255, 105, 180, 0.56);
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.2), rgba(255, 20, 147, 0.1));
+  color: #ffddef;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 8px rgba(255, 105, 180, 0.16);
+}
+
+.backtest-queue-card--second .backtest-queue-bid-btn.backtest-queue-bid-btn--secondary {
+  border-color: rgba(125, 255, 178, 0.42);
+  background: linear-gradient(135deg, rgba(125, 255, 178, 0.16), rgba(92, 234, 255, 0.09));
+  color: #d7fff0;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 8px rgba(125, 255, 178, 0.12);
 }
 
 .backtest-queue-bid-custom-inline .backtest-queue-bid-btn {

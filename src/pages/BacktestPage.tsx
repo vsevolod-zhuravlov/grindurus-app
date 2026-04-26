@@ -1146,35 +1146,29 @@ function BacktestPage() {
           <div
             className="backtest-queue-wrap"
             role="region"
-            aria-labelledby="backtest-queue-label"
+            aria-label={queueView === 'queue' ? 'Backtests Queue' : 'Backtests Stack'}
           >
-            <div className="backtest-queue-view-switch" role="tablist" aria-label="Queue data view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={queueView === 'queue'}
-                className={`backtest-queue-view-btn is-queue ${queueView === 'queue' ? 'is-active' : ''}`}
-                onClick={() => setQueueView('queue')}
-              >
-                queue
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={queueView === 'history'}
-                className={`backtest-queue-view-btn is-stack ${queueView === 'history' ? 'is-active' : ''}`}
-                onClick={() => setQueueView('history')}
-              >
-                stack
-              </button>
-            </div>
             <div className="backtest-queue-head">
-              <p
-                id="backtest-queue-label"
-                className={`backtest-queue-label ${queueView === 'queue' ? '' : 'is-stack'}`.trim()}
-              >
-                {queueView === 'queue' ? 'Backtests Queue' : 'Backtests Stack'}
-              </p>
+              <div className="backtest-queue-view-switch" role="tablist" aria-label="Queue data view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={queueView === 'queue'}
+                  className={`backtest-queue-view-btn is-queue ${queueView === 'queue' ? 'is-active' : ''}`}
+                  onClick={() => setQueueView('queue')}
+                >
+                  BACKTEST QUEUE
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={queueView === 'history'}
+                  className={`backtest-queue-view-btn is-stack ${queueView === 'history' ? 'is-active' : ''}`}
+                  onClick={() => setQueueView('history')}
+                >
+                  BACKTEST STACK
+                </button>
+              </div>
               <div
                 className={`backtest-queue-sort ${queueView === 'queue' ? '' : 'is-hidden'}`}
                 aria-label="Queue sorting"
@@ -1189,7 +1183,7 @@ function BacktestPage() {
                     aria-pressed={queueSortBy === 'priority'}
                     tabIndex={queueView === 'queue' ? 0 : -1}
                   >
-                    Priority
+                    ★ Priority
                   </button>
                   <button
                     type="button"
@@ -1198,7 +1192,7 @@ function BacktestPage() {
                     aria-pressed={queueSortBy === 'created_at'}
                     tabIndex={queueView === 'queue' ? 0 : -1}
                   >
-                    Date
+                    📅 Date
                   </button>
                 </div>
               </div>
@@ -1231,6 +1225,7 @@ function BacktestPage() {
                       >
                         {visualRow.map((item, visualIdx) => {
                           const originalIdx = visibleQueue.findIndex((q) => q.id === item.id)
+                          const isPriorityView = queueSortBy === 'priority'
                           return (
                             <div
                               key={item.id}
@@ -1246,11 +1241,25 @@ function BacktestPage() {
                             >
                               <div
                                 className={`backtest-queue-card ${
-                                  originalIdx === 0 ? 'backtest-queue-card--leader' : ''
+                                  isPriorityView && originalIdx === 0
+                                    ? 'backtest-queue-card--leader'
+                                    : isPriorityView && originalIdx === 1
+                                      ? 'backtest-queue-card--second'
+                                      : ''
                                 }`}
                                 title={`${item.base} / ${item.quote}, ${item.dateFrom} – ${item.dateTo}, ${item.baseAmount} ${item.base}, ${item.quoteAmount} ${item.quote}, ${item.creatorAddress}`}
                               >
-                              <span className="backtest-queue-index">#{originalIdx + 1}</span>
+                              <span
+                                className={`backtest-queue-index ${
+                                  isPriorityView && originalIdx === 1
+                                    ? 'is-second-priority'
+                                    : isPriorityView && originalIdx === 2
+                                      ? 'is-third-priority'
+                                      : ''
+                                }`.trim()}
+                              >
+                                #{originalIdx + 1}
+                              </span>
                               <span className="backtest-queue-pair">
                                 {item.base} / {item.quote}
                               </span>
