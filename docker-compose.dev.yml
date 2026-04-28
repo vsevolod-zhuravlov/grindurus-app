@@ -5,19 +5,25 @@ version: "3.9"
 
 name: grindurus-app-dev
 
+networks:
+  grindurus:
+    external: true
+
 services:
   app:
     build:
       context: .
       dockerfile: dockerfile
     container_name: app-dev
+    restart: unless-stopped
     command: sh -c "npm run dev -- --host 0.0.0.0 --port 3001"
+    networks:
+      - grindurus
     ports:
       - "3001:3001"
     volumes:
       - ./:/app
       - node_modules:/app/node_modules
-    restart: unless-stopped
 
 volumes:
   node_modules:

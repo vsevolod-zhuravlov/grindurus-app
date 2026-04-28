@@ -564,7 +564,7 @@ function BacktestPage() {
     x402NeedsWalletConnection
       ? 'Connect wallet'
       : payMethod === 'promocode'
-      ? 'Queue backtest'
+      ? 'QUEUE BACKTEST'
       : `Pay 1 ${quoteValue}`
   const payButtonAriaLabel = payBusy
     ? 'Processing payment'
@@ -1050,7 +1050,7 @@ function BacktestPage() {
                         </div>
                         {appliedPromocode && (
                           <p className="backtest-promocode-inline-status" aria-live="polite">
-                            Promocode applied. Now click Pay 1 {quoteValue}.
+                            Promocode applied. Now click Queue Backtest.
                           </p>
                         )}
                       </div>
@@ -1261,7 +1261,7 @@ function BacktestPage() {
                                 #{originalIdx + 1}
                               </span>
                               <span className="backtest-queue-pair">
-                                {item.base} / {item.quote}
+                                ID: {shortenCreatorAddress(item.id, 6, 4)}
                               </span>
                               <div className="backtest-queue-grid">
                                 <span className="backtest-queue-date-start">{item.dateFrom}</span>

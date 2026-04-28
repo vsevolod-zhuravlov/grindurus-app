@@ -1473,7 +1473,7 @@
   position: absolute;
   top: 0.5rem;
   right: 0.6rem;
-  font-size: 0.8rem;
+  font-size: 0.94rem;
   font-weight: 800;
   color: var(--text-secondary);
   letter-spacing: 0.03em;
@@ -1488,7 +1488,7 @@
 
 .backtest-queue-card--leader .backtest-queue-index::before {
   content: '👑';
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
@@ -1497,11 +1497,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.18rem;
+  font-size: 0.94rem;
 }
 
 .backtest-queue-index.is-second-priority::before {
   content: '🥈';
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
@@ -1510,11 +1511,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.18rem;
+  font-size: 0.94rem;
 }
 
 .backtest-queue-index.is-third-priority::before {
   content: '🥉';
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
