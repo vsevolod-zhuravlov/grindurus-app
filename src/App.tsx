@@ -14,7 +14,7 @@ function pathFromView(view: HeaderMainView): string {
 }
 
 function titleFromView(view: HeaderMainView): string {
-  return view === 'backtest' ? 'GrindURUS backtest simulator' : 'GRAI crowdfund tool'
+  return view === 'backtest' ? 'Backtest Simulator' : 'GRAI'
 }
 
 function App() {

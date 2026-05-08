@@ -225,7 +225,7 @@ function GraiPage() {
                         <span className="grai-input-suffix">{mintAsset.toUpperCase()}</span>
                       </div>
                     )}
-                    <p className="grai-estimated-amount-label">GRAI mint amount</p>
+                    <p className="grai-estimated-amount-label">GRAI:</p>
                     <button type="button" className="grai-mint-btn">
                       MINT
                     </button>

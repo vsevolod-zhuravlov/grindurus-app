@@ -150,6 +150,29 @@
   border-color: #ff69b4;
 }
 
+.backtest-date-limit-note {
+  margin: 0.2rem 0 0;
+  text-align: left;
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.9;
+}
+
+.backtest-time-estimate-note {
+  margin: 0.2rem 0 0;
+  text-align: left;
+  align-self: flex-start;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  opacity: 0.82;
+}
+
 .backtest-pair-card {
   display: flex;
   flex-direction: column;
@@ -172,6 +195,16 @@
   gap: 0.3rem;
 }
 
+.backtest-pair-col .backtest-sublabel {
+  align-self: flex-start;
+  text-align: left;
+}
+
+.backtest-pair-col:last-child .backtest-sublabel {
+  align-self: flex-end;
+  text-align: right;
+}
+
 .backtest-select {
   width: 100%;
   padding: 0.5rem 0.45rem;
@@ -188,6 +221,20 @@
 .backtest-select:focus {
   outline: none;
   border-color: #ff69b4;
+}
+
+.backtest-select.is-selected {
+  border-color: rgba(125, 255, 178, 0.85);
+  color: #7dffb2;
+  background: linear-gradient(180deg, rgba(125, 255, 178, 0.08), rgba(125, 255, 178, 0.03));
+  box-shadow: inset 0 0 0 1px rgba(125, 255, 178, 0.25);
+}
+
+.backtest-select.is-selected:focus {
+  border-color: rgba(125, 255, 178, 0.95);
+  box-shadow:
+    inset 0 0 0 1px rgba(125, 255, 178, 0.3),
+    0 0 0 1px rgba(125, 255, 178, 0.2);
 }
 
 .backtest-amounts {
@@ -918,7 +965,7 @@
   border: 1px solid var(--border-color);
   border-radius: 11px;
   overflow: hidden;
-  margin: 0 0 0.5rem;
+  margin: 0;
   background: var(--bg-secondary);
 }
 
@@ -1042,6 +1089,63 @@
   margin-left: auto;
 }
 
+.backtest-queue-search-input {
+  min-width: 10rem;
+  max-width: 14rem;
+  width: 100%;
+  min-height: 2.1rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.backtest-queue-search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.backtest-queue-search-wrap .backtest-queue-search-input {
+  max-width: none;
+}
+
+.backtest-queue-search-btn {
+  flex: 0 0 auto;
+  min-height: 2.1rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.backtest-queue-search-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.backtest-queue-search-input:focus {
+  outline: none;
+  border-color: #ff69b4;
+  box-shadow: 0 0 0 1px rgba(255, 105, 180, 0.2);
+}
+
+.backtest-queue-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
 .backtest-queue-sort.is-hidden {
   visibility: hidden;
   pointer-events: none;
@@ -1069,9 +1173,11 @@
   border-right: 1px solid var(--border-color);
   background: transparent;
   color: var(--text-secondary);
+  min-width: 5.8rem;
   padding: 0.34rem 0.8rem;
   font-size: 0.8rem;
   font-weight: 700;
+  text-align: center;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1241,16 +1347,60 @@
 .backtest-queue-grid-rows {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1.9rem;
   width: 100%;
   margin: 0;
 }
 
-.backtest-queue-grid-rows.is-no-connectors .backtest-queue-item::before,
-.backtest-queue-grid-rows.is-no-connectors .backtest-queue-item::after,
 .backtest-queue-grid-rows.is-no-connectors .backtest-queue-card::before,
 .backtest-queue-grid-rows.is-no-connectors .backtest-queue-card::after {
   content: none !important;
+}
+
+.backtest-queue-item.has-divider::before {
+  content: '';
+  position: absolute;
+  left: -1.45rem;
+  width: 1.4rem;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 105, 180, 0.98) 0 8px,
+    rgba(255, 105, 180, 0.35) 8px 14px
+  );
+  box-shadow: 0 0 8px rgba(255, 105, 180, 0.45);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.backtest-queue-item.has-divider::after {
+  content: '';
+  position: absolute;
+  left: -1.52rem;
+  top: calc(50% - 8px);
+  width: 1.56rem;
+  height: 16px;
+  background:
+    radial-gradient(circle at 3px 50%, rgba(255, 105, 180, 0.98) 0 3px, transparent 3.2px),
+    radial-gradient(circle at calc(100% - 3px) 50%, rgba(255, 105, 180, 0.98) 0 3px, transparent 3.2px);
+  filter: drop-shadow(0 0 3px rgba(255, 105, 180, 0.4));
+  pointer-events: none;
+  z-index: 3;
+}
+
+.backtest-queue-grid-row.is-reverse
+  .backtest-queue-item.has-divider::before {
+  left: auto;
+  right: -1.3rem;
+}
+
+.backtest-queue-grid-row.is-reverse
+  .backtest-queue-item.has-divider::after {
+  left: auto;
+  right: -1.32rem;
 }
 
 .backtest-queue-grid-row {
@@ -1258,7 +1408,7 @@
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 1.3rem;
+  gap: 2.6rem;
   width: 100%;
 }
 
@@ -1307,10 +1457,10 @@
 .backtest-queue-grid-row:not(.is-reverse) .backtest-queue-item.has-connector::after {
   content: '';
   position: absolute;
-  left: -1.22rem;
+  left: -2.6rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 1.22rem;
+  width: 2.6rem;
   height: 2px;
   background: linear-gradient(90deg, rgba(255, 105, 180, 0.25), rgba(255, 105, 180, 0.75));
   border-radius: 999px;
@@ -1320,7 +1470,7 @@
 .backtest-queue-grid-row:not(.is-reverse) .backtest-queue-item.has-connector::before {
   content: '';
   position: absolute;
-  left: -1.3rem;
+  left: -2.66rem;
   top: 50%;
   transform: translateY(-50%);
   width: 0;
@@ -1335,10 +1485,10 @@
 .backtest-queue-grid-row.is-reverse .backtest-queue-item.has-connector::after {
   content: '';
   position: absolute;
-  right: -1.22rem;
+  right: -2.6rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 1.22rem;
+  width: 2.6rem;
   height: 2px;
   background: linear-gradient(90deg, rgba(255, 105, 180, 0.75), rgba(255, 105, 180, 0.25));
   border-radius: 999px;
@@ -1348,7 +1498,7 @@
 .backtest-queue-grid-row.is-reverse .backtest-queue-item.has-connector::before {
   content: '';
   position: absolute;
-  right: -1.3rem;
+  right: -2.66rem;
   top: 50%;
   transform: translateY(-50%);
   width: 0;
@@ -1369,9 +1519,9 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: -1.2rem;
+  bottom: -1.9rem;
   width: 2px;
-  height: 1.2rem;
+  height: 1.9rem;
   background: linear-gradient(180deg, rgba(255, 105, 180, 0.75), rgba(255, 105, 180, 0.22));
   border-radius: 999px;
   pointer-events: none;
@@ -1394,6 +1544,8 @@
 .backtest-queue-card {
   min-width: 11.75rem;
   max-width: 13.5rem;
+  min-height: 180px;
+  height: auto;
   padding: 0.55rem 0.65rem 0.5rem;
   border-radius: 10px;
   border: 1px solid var(--border-color);
@@ -1409,6 +1561,7 @@
   width: 100%;
   min-width: 0;
   max-width: none;
+  margin: 0;
 }
 
 .backtest-queue-card--leader {
@@ -1570,6 +1723,13 @@
   gap: 0.45rem;
 }
 
+.backtest-queue-creator-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
 .backtest-queue-creator-label {
   font-size: 0.58rem;
   font-weight: 700;
@@ -1579,6 +1739,10 @@
   opacity: 0.85;
 }
 
+.backtest-queue-creator-label::before {
+  content: '👤 ';
+}
+
 .backtest-queue-priority-label {
   font-size: 0.58rem;
   font-weight: 700;
@@ -1586,6 +1750,10 @@
   letter-spacing: 0.05em;
   color: var(--text-secondary);
   opacity: 0.85;
+}
+
+.backtest-queue-priority-label::before {
+  content: '★ ';
 }
 
 .backtest-queue-creator-addr {
@@ -1600,6 +1768,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.backtest-queue-creator-copy {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.04rem 0.14rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.backtest-queue-creator-copy:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
 }
 
 .backtest-queue-priority-value {

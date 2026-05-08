@@ -10,8 +10,9 @@ import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { ChainSelectorModal } from '../components/ChainSelectorModal'
 import './BacktestPage.css'
 
-const BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
-const QUOTE_ASSETS = ['USDC', 'USDT', 'USD', 'SOL'] as const
+const DEFAULT_BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
+const DEFAULT_QUOTE_ASSETS = ['USDC', 'USDT', 'USD', 'SOL'] as const
+const DEFAULT_BASE_ASSET = 'SOL'
 
 const PAY_METHODS = ['x402', 'kirapay', 'promocode'] as const
 type PayMethod = (typeof PAY_METHODS)[number]
@@ -69,6 +70,11 @@ type BacktestHistoryItem = {
 type ApiHealth = {
   status: string
   backtest_price?: string
+}
+
+type ApiSymbols = {
+  base_assets?: unknown
+  quote_assets?: unknown
 }
 
 function shortenCreatorAddress(addr: string, head = 6, tail = 4) {
@@ -250,6 +256,12 @@ function parseInputDate(s: string) {
   return new Date(y, (m || 1) - 1, d || 1)
 }
 
+function addDays(date: Date, days: number) {
+  const out = new Date(date)
+  out.setDate(out.getDate() + days)
+  return out
+}
+
 function daysInclusive(from: string, to: string) {
   const a = parseInputDate(from)
   const b = parseInputDate(to)
@@ -302,8 +314,10 @@ function BacktestPage() {
 
   const [dateFrom, setDateFrom] = useState(() => toInputDateValue(start))
   const [dateTo, setDateTo] = useState(() => toInputDateValue(end))
-  const [baseAsset, setBaseAsset] = useState<(typeof BASE_ASSETS)[number]>('ETH')
-  const [quoteAsset, setQuoteAsset] = useState<(typeof QUOTE_ASSETS)[number]>('USDC')
+  const [baseAssets, setBaseAssets] = useState<string[]>([...DEFAULT_BASE_ASSETS])
+  const [quoteAssets, setQuoteAssets] = useState<string[]>([...DEFAULT_QUOTE_ASSETS])
+  const [baseAsset, setBaseAsset] = useState<string>(DEFAULT_BASE_ASSET)
+  const [quoteAsset, setQuoteAsset] = useState<string>(DEFAULT_QUOTE_ASSETS[0])
   const [baseAmount, setBaseAmount] = useState('')
   const [quoteAmount, setQuoteAmount] = useState('')
   const [payBusy, setPayBusy] = useState(false)
@@ -320,6 +334,7 @@ function BacktestPage() {
   const [defaultBidPrice, setDefaultBidPrice] = useState('1')
   const [queueItems, setQueueItems] = useState<BacktestQueueItem[]>([])
   const [queueSortBy, setQueueSortBy] = useState<'priority' | 'created_at'>('priority')
+  const [queueSearch, setQueueSearch] = useState('')
   const [queueView, setQueueView] = useState<'queue' | 'history'>('queue')
   const [queueLoading, setQueueLoading] = useState(false)
   const [queueError, setQueueError] = useState('')
@@ -330,6 +345,7 @@ function BacktestPage() {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const payMethodWrapRef = useRef<HTMLDivElement>(null)
   const queueScrollerRef = useRef<HTMLDivElement>(null)
+  const queueSearchInputRef = useRef<HTMLInputElement>(null)
   const { isConnected: isEvmConnected } = useAccount()
   const solanaWallet = useSolanaWallet()
   const chainId = useChainId()
@@ -351,18 +367,37 @@ function BacktestPage() {
   }, [evmWalletNetwork, payMethod, solanaWallet.isConnected, solanaWallet.signTransaction, solanaWalletNetwork])
 
   const quoteOptions = useMemo(
-    () => QUOTE_ASSETS.filter((q) => !(baseAsset === 'SOL' && q === 'SOL')),
-    [baseAsset]
+    () => quoteAssets.filter((q) => !(baseAsset === 'SOL' && q === 'SOL')),
+    [baseAsset, quoteAssets]
   )
 
   const onFromChange = (v: string) => {
+    const nextFrom = parseInputDate(v)
+    const currentTo = parseInputDate(dateTo)
+    const maxTo = addDays(nextFrom, 4)
     setDateFrom(v)
-    if (parseInputDate(v) > parseInputDate(dateTo)) setDateTo(v)
+    if (nextFrom > currentTo) {
+      setDateTo(v)
+      return
+    }
+    if (currentTo > maxTo) {
+      setDateTo(toInputDateValue(maxTo))
+    }
   }
 
   const onToChange = (v: string) => {
+    const nextTo = parseInputDate(v)
+    const currentFrom = parseInputDate(dateFrom)
+    const minFrom = addDays(nextTo, -4)
+    if (nextTo < currentFrom) {
+      setDateTo(v)
+      setDateFrom(v)
+      return
+    }
+    if (currentFrom < minFrom) {
+      setDateFrom(toInputDateValue(minFrom))
+    }
     setDateTo(v)
-    if (parseInputDate(v) < parseInputDate(dateFrom)) setDateFrom(v)
   }
 
   const sanitizeDecimal = (raw: string) => {
@@ -397,7 +432,7 @@ function BacktestPage() {
         params: {
           payment_method: payMethod,
           wallet_network: walletNetwork,
-          base_asset: baseAsset,
+          base_asset: baseValue,
           quote_asset: quoteValue,
           base_amount: baseAmount.trim() || '0',
           quote_amount: quoteAmount.trim() || '0',
@@ -552,7 +587,10 @@ function BacktestPage() {
     setPayMethod('kirapay')
   }
 
-  const quoteValue = quoteOptions.includes(quoteAsset) ? quoteAsset : quoteOptions[0]
+  const baseValue = baseAsset.trim() || baseAssets[0] || DEFAULT_BASE_ASSET
+  const quoteValue = quoteAsset.trim() || quoteOptions[0] || DEFAULT_QUOTE_ASSETS[0]
+  const isBaseSelected = baseAsset.trim().length > 0
+  const isQuoteSelected = quoteAsset.trim().length > 0
   const hasEvmSigner = isEvmConnected && !!walletClient?.account?.address
   const hasSvmSigner =
     !!solanaWallet.address &&
@@ -755,6 +793,37 @@ function BacktestPage() {
 
   useEffect(() => {
     const ac = new AbortController()
+    const loadSymbols = async () => {
+      try {
+        const response = await fetch(`${backtestApiOrigin}/symbols`, { signal: ac.signal })
+        if (!response.ok) return
+        const payload = (await response.json()) as ApiSymbols
+
+        const normalizeSymbols = (value: unknown): string[] =>
+          Array.isArray(value)
+            ? Array.from(
+                new Set(
+                  value
+                    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+                    .map((item) => item.trim().toUpperCase())
+                )
+              )
+            : []
+
+        const nextBaseAssets = normalizeSymbols(payload.base_assets)
+        const nextQuoteAssets = normalizeSymbols(payload.quote_assets)
+        if (nextBaseAssets.length > 0) setBaseAssets(nextBaseAssets)
+        if (nextQuoteAssets.length > 0) setQuoteAssets(nextQuoteAssets)
+      } catch {
+        // Keep default symbol lists when symbols endpoint is unavailable.
+      }
+    }
+    void loadSymbols()
+    return () => ac.abort()
+  }, [backtestApiOrigin])
+
+  useEffect(() => {
+    const ac = new AbortController()
     const loadHealth = async () => {
       try {
         const response = await fetch(`${backtestApiOrigin}/health`, { signal: ac.signal })
@@ -768,12 +837,6 @@ function BacktestPage() {
     void loadHealth()
     return () => ac.abort()
   }, [backtestApiOrigin])
-
-  useEffect(() => {
-    if (!quoteOptions.includes(quoteAsset)) {
-      setQuoteAsset(quoteOptions[0])
-    }
-  }, [baseAsset, quoteAsset, quoteOptions])
 
   useEffect(() => {
     if (!payMenuOpen) return
@@ -802,7 +865,7 @@ function BacktestPage() {
       const cardMin = 190
       const gap = 10
       const cols = Math.max(1, Math.floor((el.clientWidth + gap) / (cardMin + gap)))
-      setQueueColumns(cols)
+      setQueueColumns(Math.min(3, cols))
     }
 
     updateColumns()
@@ -810,7 +873,24 @@ function BacktestPage() {
     return () => window.removeEventListener('resize', updateColumns)
   }, [])
 
-  const visibleQueue = queueItems
+  const visibleQueue = useMemo(() => {
+    const query = queueSearch.trim().toLowerCase()
+    if (!query) return queueItems
+    return queueItems.filter((item) => {
+      const haystack = [
+        item.id,
+        item.creatorAddress,
+        item.base,
+        item.quote,
+        item.dateFrom,
+        item.dateTo,
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [queueItems, queueSearch])
+  const isQueueSearchActive = queueSearch.trim().length > 0
   const queuePriorityRaw = useMemo(
     () => visibleQueue.reduce((acc, item) => acc + Number(item.usdcPaid || 0), 0),
     [visibleQueue]
@@ -850,9 +930,10 @@ function BacktestPage() {
       <div className="backtest-layout">
         <div className="backtest-panel-wrap">
           <aside className="backtest-panel">
-          <p className="backtest-panel-heading">Create backtest</p>
+          <p className="backtest-panel-heading">Create Backtest</p>
 
           <div className="backtest-field">
+            <p className="backtest-date-limit-note">Max period: 5 days</p>
             <div className="backtest-dates" role="group" aria-label="Backtest date range">
               <div className="backtest-date-col">
                 <label className="backtest-sublabel" htmlFor="backtest-date-from">
@@ -882,6 +963,7 @@ function BacktestPage() {
                 />
               </div>
             </div>
+            <p className="backtest-time-estimate-note">Est. backtest time ~ 5 min</p>
           </div>
 
           <div className="backtest-pair-card" role="group" aria-label="Trading pair">
@@ -890,22 +972,25 @@ function BacktestPage() {
                 <label className="backtest-sublabel" htmlFor="backtest-base">
                   Base
                 </label>
-                <select
+                <input
                   id="backtest-base"
-                  className="backtest-select"
+                  type="text"
+                  list="backtest-base-options"
+                  className={`backtest-select ${isBaseSelected ? 'is-selected' : ''}`}
                   value={baseAsset}
                   onChange={(e) => {
-                    const v = e.target.value as (typeof BASE_ASSETS)[number]
+                    const v = e.target.value.toUpperCase()
                     setBaseAsset(v)
                     if (v === 'SOL' && quoteAsset === 'SOL') setQuoteAsset('USDC')
                   }}
-                >
-                  {BASE_ASSETS.map((a) => (
+                />
+                <datalist id="backtest-base-options">
+                  {baseAssets.map((a) => (
                     <option key={a} value={a}>
                       {a}
                     </option>
                   ))}
-                </select>
+                </datalist>
                 <div className="backtest-amount-with-suffix">
                   <input
                     id="backtest-base-amt"
@@ -924,18 +1009,21 @@ function BacktestPage() {
                 <label className="backtest-sublabel" htmlFor="backtest-quote">
                   Quote
                 </label>
-                <select
+                <input
                   id="backtest-quote"
-                  className="backtest-select"
-                  value={quoteValue}
-                  onChange={(e) => setQuoteAsset(e.target.value as (typeof QUOTE_ASSETS)[number])}
-                >
+                  type="text"
+                  list="backtest-quote-options"
+                  className={`backtest-select ${isQuoteSelected ? 'is-selected' : ''}`}
+                  value={quoteAsset}
+                  onChange={(e) => setQuoteAsset(e.target.value.toUpperCase())}
+                />
+                <datalist id="backtest-quote-options">
                   {quoteOptions.map((a) => (
                     <option key={a} value={a}>
                       {a}
                     </option>
                   ))}
-                </select>
+                </datalist>
                 <div className="backtest-amount-with-suffix">
                   <input
                     id="backtest-quote-amt"
@@ -1174,7 +1262,31 @@ function BacktestPage() {
                 aria-label="Queue sorting"
                 aria-hidden={queueView !== 'queue'}
               >
-                <span className="backtest-queue-sort-label">Sort by:</span>
+                <div className="backtest-queue-search-wrap">
+                  <input
+                    ref={queueSearchInputRef}
+                    type="search"
+                    className="backtest-queue-search-input"
+                    value={queueSearch}
+                    onChange={(e) => setQueueSearch(e.target.value)}
+                    placeholder="ID / Creator Address"
+                    aria-label="Search in queue"
+                    tabIndex={queueView === 'queue' ? 0 : -1}
+                  />
+                  <button
+                    type="button"
+                    className="backtest-queue-search-btn"
+                    onClick={() => {
+                      setQueueSearch((prev) => prev.trim())
+                      queueSearchInputRef.current?.focus()
+                    }}
+                    aria-label="Search queue"
+                    tabIndex={queueView === 'queue' ? 0 : -1}
+                  >
+                    <span aria-hidden="true">🔍</span>
+                    <span>Search</span>
+                  </button>
+                </div>
                 <div className="backtest-queue-sort-switch" role="group" aria-label="Sort queue by">
                   <button
                     type="button"
@@ -1207,14 +1319,14 @@ function BacktestPage() {
               >
                 <div
                   className={`backtest-queue-grid-rows ${
-                    queueSortBy === 'created_at' ? 'is-no-connectors' : ''
+                    queueSortBy === 'created_at' || isQueueSearchActive ? 'is-no-connectors' : ''
                   }`}
                   role="list"
                 >
                   {queueRows.map((row, rowIdx) => {
                     const isReverse = rowIdx % 2 === 1
                     const visualRow = row
-                    const showConnectors = queueSortBy !== 'created_at'
+                    const showConnectors = queueSortBy !== 'created_at' && !isQueueSearchActive
                     return (
                       <div
                         key={`queue-row-${rowIdx}`}
@@ -1225,12 +1337,14 @@ function BacktestPage() {
                       >
                         {visualRow.map((item, visualIdx) => {
                           const originalIdx = visibleQueue.findIndex((q) => q.id === item.id)
-                          const isPriorityView = queueSortBy === 'priority'
+                          const isPriorityView = queueSortBy === 'priority' && !isQueueSearchActive
                           return (
                             <div
                               key={item.id}
                               className={`backtest-queue-item ${
                               showConnectors && visualIdx > 0 ? 'has-connector' : ''
+                              } ${
+                              !showConnectors && isQueueSearchActive && visualIdx > 0 ? 'has-divider' : ''
                               } ${
                               showConnectors &&
                               visualIdx === visualRow.length - 1 &&
@@ -1279,11 +1393,24 @@ function BacktestPage() {
                                   <span className="backtest-queue-priority-label">Priority</span>
                                 </div>
                                 <div className="backtest-queue-creator-bottom">
-                                  <span
-                                    className="backtest-queue-creator-addr"
-                                    title={item.creatorAddress}
-                                  >
-                                    {shortenCreatorAddress(item.creatorAddress)}
+                                  <span className="backtest-queue-creator-main">
+                                    <span
+                                      className="backtest-queue-creator-addr"
+                                      title={item.creatorAddress}
+                                    >
+                                      {shortenCreatorAddress(item.creatorAddress)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="backtest-queue-creator-copy"
+                                      onClick={() => {
+                                        void navigator.clipboard.writeText(item.creatorAddress)
+                                      }}
+                                      aria-label={`Copy creator address ${item.creatorAddress}`}
+                                      title="Copy creator address"
+                                    >
+                                      ⧉
+                                    </button>
                                   </span>
                                   <span className="backtest-queue-priority-value">
                                     {item.usdcPaid} USDC
