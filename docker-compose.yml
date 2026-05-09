@@ -22,13 +22,9 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=grindurus
-      # --- localhost ---
-      - traefik.http.routers.app-localhost.rule=Host(`app.localhost`)
-      - traefik.http.routers.app-localhost.tls=true
-      - traefik.http.routers.app-localhost.entrypoints=websecure
-
-      # --- prod HTTP → HTTPS redirect ---
-      - traefik.http.routers.app.rule=Host(`app.grindurus.xyz`)
+      
+      # --- HTTP → HTTPS redirect ---
+      - traefik.http.routers.app.rule=Host(`app.${DOMAIN:-localhost}`)
       - traefik.http.routers.app.tls.certresolver=le
       - traefik.http.routers.app.entrypoints=websecure
 
