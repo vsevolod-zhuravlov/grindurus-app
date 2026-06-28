@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PublicKey } from '@solana/web3.js'
-import type { GrinderConfig } from '../grai/grinders'
+import {
+  fetchGrinderCustodyHoldings,
+  indexGrinderCustodyHoldings,
+  mergeGrinderCustodyHoldings,
+  solanaClusterToCustodyNetwork,
+  type NormalizedCustodyHolding,
+} from '../grai/custodyHoldings'
+import { grinderCustodyAddress, type GrinderConfig } from '../grai/grinders'
 import {
   fetchCustodyWalletBalances,
   type CustodyAssetBalances,
@@ -11,7 +18,23 @@ export type GrinderCustodyState = {
   id: string
   name: string
   custodyWallet: PublicKey | null
+  custodyWalletAddress: string
+  /** Live Solana on-chain balances keyed by mint (used by allocate / distribute txs). */
   balances: Record<string, CustodyAssetBalances>
+  /** Merged backend + on-chain holdings for display (multi-network ready). */
+  holdings: NormalizedCustodyHolding[]
+}
+
+function toGrinderRow(grinder: GrinderConfig): GrinderCustodyState {
+  const custodyWallet = parseCustodyWallet(grinder.custodyWallet)
+  return {
+    id: grinder.id,
+    name: grinder.name,
+    custodyWallet,
+    custodyWalletAddress: grinderCustodyAddress(grinder, custodyWallet),
+    balances: {},
+    holdings: [],
+  }
 }
 
 function parseCustodyWallet(value: string | undefined): PublicKey | null {
@@ -25,54 +48,70 @@ function parseCustodyWallet(value: string | undefined): PublicKey | null {
 
 export function useGrindersCustodyBalances(grinders: GrinderConfig[]) {
   const { connection, solana, isConfigured } = useGraiDeployment()
-  const [rows, setRows] = useState<GrinderCustodyState[]>(() =>
-    grinders.map((grinder) => ({
-      id: grinder.id,
-      name: grinder.name,
-      custodyWallet: parseCustodyWallet(grinder.custodyWallet),
-      balances: {},
-    })),
-  )
+  const [rows, setRows] = useState<GrinderCustodyState[]>(() => grinders.map(toGrinderRow))
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!connection || !solana || !isConfigured) {
-      setRows(
-        grinders.map((grinder) => ({
-          id: grinder.id,
-          name: grinder.name,
-          custodyWallet: parseCustodyWallet(grinder.custodyWallet),
-          balances: {},
-        })),
-      )
-      setError(null)
-      setIsLoading(false)
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
     try {
+      const backendByGrinder = indexGrinderCustodyHoldings(
+        await fetchGrinderCustodyHoldings(grinders.map((grinder) => grinder.id)),
+      )
+
+      if (!connection || !solana || !isConfigured) {
+        setRows(
+          grinders.map((grinder) => {
+            const base = toGrinderRow(grinder)
+            const custodyAddress = base.custodyWalletAddress
+            return {
+              ...base,
+              holdings: mergeGrinderCustodyHoldings({
+                backendHoldings: backendByGrinder[grinder.id] ?? [],
+                onChainBalances: {},
+                custodyAddress,
+                solanaNetwork: solanaClusterToCustodyNetwork(solana?.cluster ?? 'devnet'),
+              }),
+            }
+          }),
+        )
+        return
+      }
+
+      const solanaNetwork = solanaClusterToCustodyNetwork(solana.cluster)
+
       const nextRows = await Promise.all(
         grinders.map(async (grinder) => {
           const custodyWallet = parseCustodyWallet(grinder.custodyWallet)
+          const base = toGrinderRow(grinder)
+          const custodyAddress = grinderCustodyAddress(grinder, custodyWallet)
+
           if (!custodyWallet) {
             return {
-              id: grinder.id,
-              name: grinder.name,
-              custodyWallet: null,
-              balances: {},
+              ...base,
+              holdings: mergeGrinderCustodyHoldings({
+                backendHoldings: backendByGrinder[grinder.id] ?? [],
+                onChainBalances: {},
+                custodyAddress,
+                solanaNetwork,
+              }),
             }
           }
 
           const balances = await fetchCustodyWalletBalances(connection, solana, custodyWallet)
           return {
-            id: grinder.id,
-            name: grinder.name,
+            ...base,
             custodyWallet,
+            custodyWalletAddress: custodyAddress,
             balances,
+            holdings: mergeGrinderCustodyHoldings({
+              backendHoldings: backendByGrinder[grinder.id] ?? [],
+              onChainBalances: balances,
+              custodyAddress,
+              solanaNetwork,
+            }),
           }
         }),
       )

@@ -1,8 +1,8 @@
 .grai-manage-page {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem 0.5rem 3rem;
+  max-width: none;
+  margin: 0;
+  padding: 2rem 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -10,9 +10,6 @@
 }
 
 .grai-manage-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
@@ -21,10 +18,11 @@
   align-items: center;
   gap: 0.65rem;
   align-self: flex-start;
+  min-height: 36px;
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 1.5rem;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -34,8 +32,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   border: 1px solid var(--border-color);
   border-radius: 7px;
@@ -51,7 +49,7 @@
 }
 
 .grai-manage-back-text {
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .grai-manage-back:hover {
@@ -94,19 +92,45 @@
 
 .grai-manage-junior-vault-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.55rem;
 }
 
+.grai-manage-vault-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
 .grai-manage-junior-vault-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin: 0;
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.grai-manage-junior-vault-title-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: #ff9ed3;
+}
+
+.grai-manage-junior-vault-title-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .grai-manage-junior-vault-nav {
@@ -124,8 +148,51 @@
   grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
 }
 
+.grai-manage-junior-vault-table .grai-balance-table-cell--head {
+  justify-content: flex-start;
+  text-align: left;
+}
+
 .grai-manage-custody-vault-table {
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) repeat(2, minmax(0, 1fr));
+  overflow: visible;
+}
+
+.grai-manage-custody-vault-table .grai-balance-table-cell--head {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.grai-manage-custody-vault-table .grai-balance-table-row:not(.grai-balance-table-row--head) .grai-balance-table-cell.grai-asset-cell:first-child {
+  overflow: visible;
+}
+
+.grai-manage-custody-held-assets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem 0.55rem;
+}
+
+.grai-manage-custody-held-asset {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.08rem;
+}
+
+.grai-manage-custody-held-network {
+  font-size: 0.62rem;
+  line-height: 1.1;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  text-transform: lowercase;
+}
+
+.grai-manage-custody-held-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.28rem;
 }
 
 .grai-manage-custody-wallet-link {
@@ -171,10 +238,11 @@
 .grai-manage-card-title {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-primary);
 }
 
@@ -183,14 +251,14 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 1rem;
+  height: 1rem;
   color: #ff9ed3;
 }
 
 .grai-manage-card-title-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 1rem;
+  height: 1rem;
   display: block;
 }
 
@@ -298,11 +366,59 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   line-height: 1.4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.grai-manage-card > .grai-manage-card-title-row + .grai-manage-hint {
+  margin-top: calc(-1rem + 0.15rem);
 }
 
 .grai-manage-hint code {
   font-size: 0.78rem;
   color: #ff9ed3;
+}
+
+.grai-manage-hint.is-wallet-warning:not(.is-wallet-warning-acknowledged) .grai-manage-hint-wallet {
+  animation: grai-manage-wallet-warning-blink 1.15s ease-in-out infinite;
+}
+
+.grai-manage-hint-ok {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid rgba(255, 77, 109, 0.55);
+  border-radius: 4px;
+  background: rgba(255, 77, 109, 0.12);
+  color: #ff4d6d;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.grai-manage-hint-ok:hover {
+  background: rgba(255, 77, 109, 0.22);
+  border-color: rgba(255, 77, 109, 0.75);
+}
+
+.grai-manage-hint.is-wallet-warning code,
+.grai-manage-hint.is-wallet-warning .grai-manage-hint-status {
+  color: #ff4d6d;
+}
+
+@keyframes grai-manage-wallet-warning-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.42;
+  }
 }
 
 .grai-manage-feedback {
@@ -329,7 +445,8 @@
 }
 
 .grai-manage-btn {
-  align-self: flex-start;
+  align-self: stretch;
+  width: 100%;
   margin-top: auto;
   background: linear-gradient(135deg, #ff69b4, #c084fc);
   border: none;
@@ -357,56 +474,15 @@
 }
 
 .grai-manage-protocol-info {
-  align-self: flex-start;
-  text-align: left;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  word-break: break-all;
-  margin-bottom: 1rem;
+  margin: 0 0 1rem;
 }
 
-.grai-manage-protocol-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: inherit;
-  text-decoration: none;
-  max-width: 100%;
+.grai-manage-protocol-info .grai-page-ca-link-text {
+  cursor: copy;
 }
 
-.grai-manage-protocol-link code {
-  font-size: 0.78rem;
-  color: #ff9ed3;
-  cursor: pointer;
-}
-
-.grai-manage-protocol-link code.is-copied {
+.grai-manage-protocol-info .grai-page-ca-link-text.is-copied {
   color: #7dffb2;
-}
-
-.grai-manage-protocol-link-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 0.9rem;
-  height: 0.9rem;
-  opacity: 0.82;
-  color: #ff9ed3;
-}
-
-.grai-manage-protocol-link-icon svg {
-  width: 0.9rem;
-  height: 0.9rem;
-  display: block;
-}
-
-.grai-manage-protocol-link:hover code {
-  text-decoration: underline;
-}
-
-.grai-manage-protocol-link:hover .grai-manage-protocol-link-icon {
-  opacity: 1;
 }
 
 .grai-manage-custody-grinder-row.is-clickable {
@@ -417,6 +493,101 @@
   color: #ff9ed3;
 }
 
-.grai-manage-custody-grinder-row.is-selected .grai-grinder-name {
-  color: #ff69b4;
+.grai-manage-custody-field {
+  width: 100%;
+}
+
+.grai-manage-custody-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 0.1rem 0;
+  border: none;
+  background: transparent;
+  color: #ff9ed3;
+  font: inherit;
+  outline: none;
+}
+
+.grai-manage-custody-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.72;
+}
+
+.grai-manage-custody-input:focus {
+  outline: none;
+}
+
+.grai-manage-custody-empty {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.grai-manage-custody-field .grai-mint-asset-item .grai-grinder-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.grai-manage-custody-item-address {
+  font-size: 0.78rem;
+  color: #ff9ed3;
+  font-variant-numeric: tabular-nums;
+}
+
+.grai-manage-custody-selected-name {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #ff9ed3;
+}
+
+.grai-manage-custody-selected-name .grai-grinder-active-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.grai-manage-custody-field .grai-mint-asset-label-text {
+  align-items: center;
+}
+
+.grai-manage-custody-field .grai-mint-asset-item.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.grai-manage-custody-field .grai-mint-asset-item.is-disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.grai-manage-custody-field .grai-mint-asset-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.grai-manage-custody-field .grai-mint-asset-item.active .grai-mint-asset-item-solscan:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.grai-grinder-name-copy {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: copy;
+}
+
+.grai-grinder-name-copy:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.grai-grinder-name-copy.is-copied {
+  color: #5bff9b;
 }

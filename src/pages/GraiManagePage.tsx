@@ -5,7 +5,9 @@ import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { fetchGraiStateFixedFields } from '../grai/graiStateCache'
 import { fetchMintDecimals, formatTokenBalance, normalizeDecimalInput } from '../grai/onchain'
 import { formatVaultBalanceDisplay } from '../grai/formatVaultBalance'
-import { KNOWN_GRINDERS } from '../grai/grinders'
+import { KNOWN_GRINDERS, grinderCustodyAddress } from '../grai/grinders'
+import type { GrinderCustodyState } from '../hooks/useGrindersCustodyBalances'
+import type { CustodyNetwork } from '../grai/custodyHoldings'
 import { USD_SCALE } from '../grai/tokenomics'
 import { useGraiAllocate } from '../hooks/useGraiAllocate'
 import { useGraiAssets } from '../hooks/useGraiAssets'
@@ -79,6 +81,76 @@ function shortenAddress(value: string, head = 6, tail = 6) {
   return `${value.slice(0, head)}...${value.slice(-tail)}`
 }
 
+type CustodyHeldAssetRow = {
+  asset: GraiAsset
+  balance: string
+  yield: string
+  network: CustodyNetwork
+}
+
+function grinderHeldAssets(grinder: Pick<GrinderCustodyState, 'holdings'>): CustodyHeldAssetRow[] {
+  return grinder.holdings.map((holding) => ({
+    asset: holding.asset,
+    balance: formatVaultBalanceDisplay(holding.balanceRaw, holding.decimals),
+    yield: formatVaultBalanceDisplay(holding.yieldRaw, holding.decimals),
+    network: holding.network,
+  }))
+}
+
+function findSelectedGrinder(
+  grinders: GrinderCustodyState[],
+  grinderId: string,
+  wallet: string,
+): GrinderCustodyState | undefined {
+  if (grinderId) {
+    const match = grinders.find((grinder) => grinder.id === grinderId)
+    if (match) return match
+  }
+  const trimmed = wallet.trim()
+  if (!trimmed) return undefined
+  return grinders.find(
+    (grinder) =>
+      grinder.custodyWalletAddress === trimmed || grinder.custodyWallet?.toBase58() === trimmed,
+  )
+}
+
+function GraiGrinderName({
+  grinder,
+  copied,
+  onCopy,
+}: {
+  grinder: Pick<GrinderCustodyState, 'id' | 'name' | 'custodyWalletAddress'>
+  copied: boolean
+  onCopy: (wallet: string, grinderId: string) => void
+}) {
+  const wallet = grinder.custodyWalletAddress || null
+
+  return (
+    <span className="grai-grinder-name">
+      <span className="grai-grinder-active-dot" aria-hidden="true" />
+      {wallet ? (
+        <span className="grai-mint-asset-short-address-wrap">
+          <span className="grai-mint-asset-full-address">{wallet}</span>
+          <button
+            type="button"
+            className={`grai-grinder-name-copy${copied ? ' is-copied' : ''}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onCopy(wallet, grinder.id)
+            }}
+            title={copied ? 'Copied to clipboard' : `Copy ${grinder.name} address`}
+            aria-label={copied ? 'Copied to clipboard' : `Copy ${grinder.name} address`}
+          >
+            {copied ? 'Copied!' : grinder.name}
+          </button>
+        </span>
+      ) : (
+        grinder.name
+      )}
+    </span>
+  )
+}
+
 function GraiFieldLabel({ children, icon }: { children: string; icon?: ReactNode }) {
   return (
     <span className="grai-field-label grai-field-label--with-icon">
@@ -140,6 +212,8 @@ type GraiManageAssetFieldProps = {
   onSelect: (mint: string) => void
   solscanTokenUrl: (mint: string) => string
   listId: string
+  listEmptyMessage?: string
+  label?: string
 }
 
 function GraiManageAssetField({
@@ -152,6 +226,8 @@ function GraiManageAssetField({
   onSelect,
   solscanTokenUrl,
   listId,
+  listEmptyMessage,
+  label = 'Asset',
 }: GraiManageAssetFieldProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [addressCopied, setAddressCopied] = useState(false)
@@ -187,7 +263,7 @@ function GraiManageAssetField({
               <span className="grai-mint-asset-label-text">
                 <span className="grai-field-label grai-field-label--with-icon">
                   <span className="grai-field-label-icon">{ASSET_FIELD_ICON}</span>
-                  Asset
+                  {label}
                 </span>
                 {selectedAsset?.mint && (
                   <span className="grai-mint-asset-address-actions">
@@ -243,7 +319,9 @@ function GraiManageAssetField({
                   </span>
                 )}
                 <span className="grai-mint-asset-symbol">
-                  {isLoading ? 'Loading…' : selectedAsset?.symbol ?? (error ? 'Unavailable' : '—')}
+                  {isLoading
+                    ? 'Loading…'
+                    : selectedAsset?.symbol ?? (assets.length === 0 ? (listEmptyMessage ?? '—') : error ? 'Unavailable' : '—')}
                 </span>
               </button>
               <button
@@ -260,9 +338,14 @@ function GraiManageAssetField({
             </div>
           </div>
         </div>
-        {menuOpen && assets.length > 0 && (
+        {menuOpen && (
           <div className="grai-mint-asset-list" id={listId} role="listbox" aria-label="Asset list">
-            {assets.map((asset) => (
+            {assets.length === 0 ? (
+              <div className="grai-manage-custody-empty" role="presentation">
+                {listEmptyMessage ?? 'No assets available'}
+              </div>
+            ) : (
+              assets.map((asset) => (
               <div
                 key={asset.mint}
                 role="option"
@@ -305,11 +388,197 @@ function GraiManageAssetField({
                   {MINT_ASSET_SOLSCAN_ICON}
                 </a>
               </div>
-            ))}
+            ))
+            )}
           </div>
         )}
       </div>
       {error && <p className="grai-registry-hint is-error">{error}</p>}
+    </div>
+  )
+}
+
+type GraiManageCustodyFieldProps = {
+  id: string
+  grinders: GrinderCustodyState[]
+  selectedWallet: string
+  selectedGrinderId: string
+  onChange: (wallet: string) => void
+  onSelectGrinder: (grinder: GrinderCustodyState) => void
+  onFocus?: () => void
+  menuOpen: boolean
+  onMenuOpenChange: (open: boolean) => void
+  solscanAccountUrl: (address: string) => string
+  listId: string
+}
+
+function GraiManageCustodyField({
+  id,
+  grinders,
+  selectedWallet,
+  selectedGrinderId,
+  onChange,
+  onSelectGrinder,
+  onFocus,
+  menuOpen,
+  onMenuOpenChange,
+  solscanAccountUrl,
+  listId,
+}: GraiManageCustodyFieldProps) {
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const trimmedWallet = selectedWallet.trim()
+
+  const selectedGrinder = useMemo(() => {
+    if (selectedGrinderId) {
+      const match = grinders.find((grinder) => grinder.id === selectedGrinderId)
+      if (match) return match
+    }
+    if (!trimmedWallet) return undefined
+    return grinders.find(
+      (grinder) =>
+        grinder.custodyWalletAddress === trimmedWallet ||
+        grinder.custodyWallet?.toBase58() === trimmedWallet,
+    )
+  }, [grinders, selectedGrinderId, trimmedWallet])
+
+  const selectGrinder = useCallback(
+    (grinder: GrinderCustodyState) => {
+      onSelectGrinder(grinder)
+      onMenuOpenChange(false)
+      window.requestAnimationFrame(() => {
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      })
+    },
+    [onMenuOpenChange, onSelectGrinder],
+  )
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        onMenuOpenChange(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [menuOpen, onMenuOpenChange])
+
+  return (
+    <div className="grai-mint-asset-field grai-manage-custody-field" id={id}>
+      <div className="grai-mint-asset-dropdown" ref={dropdownRef}>
+        <div className={`grai-mint-asset-trigger ${menuOpen ? 'is-open' : ''}`}>
+          <div className="grai-mint-asset-value grai-mint-asset-value--combined">
+            <div className={`grai-mint-asset-label-row${selectedGrinder ? ' has-custody-selection' : ''}`}>
+              <span className="grai-mint-asset-label-text">
+                <span className="grai-field-label grai-field-label--with-icon">
+                  <span className="grai-field-label-icon">{CUSTODY_FIELD_ICON}</span>
+                  Custody
+                </span>
+                {selectedGrinder && (
+                  <span className="grai-grinder-name grai-manage-custody-selected-name">
+                    <span className="grai-grinder-active-dot" aria-hidden="true" />
+                    {selectedGrinder.name}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="grai-mint-asset-value-main">
+              <input
+                ref={inputRef}
+                id={`${id}-input`}
+                type="text"
+                className="grai-input grai-manage-custody-input"
+                placeholder="Grinder wallet pubkey"
+                value={selectedWallet}
+                onChange={(event) => onChange(event.target.value)}
+                onFocus={() => onFocus?.()}
+                spellCheck={false}
+                autoComplete="off"
+                aria-controls={listId}
+                aria-expanded={menuOpen}
+                aria-haspopup="listbox"
+              />
+              <button
+                type="button"
+                className="grai-mint-asset-caret-btn"
+                onClick={() => {
+                  onFocus?.()
+                  onMenuOpenChange(!menuOpen)
+                }}
+                aria-label="Open custody list"
+              >
+                <span className="grai-mint-asset-caret" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+        {menuOpen && (
+          <div className="grai-mint-asset-list" id={listId} role="listbox" aria-label="Custody list">
+            {grinders.length === 0 ? (
+              <div className="grai-manage-custody-empty" role="presentation">
+                No grinders in custody list
+              </div>
+            ) : (
+              grinders.map((grinder) => {
+                const address = grinder.custodyWalletAddress
+                const isSelected =
+                  grinder.id === selectedGrinderId ||
+                  (address !== '' && trimmedWallet === address)
+
+                return (
+                  <div
+                    key={grinder.id}
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`grai-mint-asset-item${isSelected ? ' active' : ''}`}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      selectGrinder(grinder)
+                    }}
+                    onClick={() => {
+                      selectGrinder(grinder)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        selectGrinder(grinder)
+                      }
+                    }}
+                    tabIndex={0}
+                  >
+                    <span className="grai-grinder-name">
+                      <span className="grai-grinder-active-dot" aria-hidden="true" />
+                      {grinder.name}
+                    </span>
+                    <span className="grai-manage-custody-item-address">
+                      {address ? shortenAddress(address) : 'Not configured'}
+                    </span>
+                    {address && (
+                      <a
+                        href={solscanAccountUrl(address)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="grai-mint-asset-item-solscan"
+                        aria-label={`View ${grinder.name} on Solscan`}
+                        title={`View ${grinder.name} on Solscan`}
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                      >
+                        {MINT_ASSET_SOLSCAN_ICON}
+                      </a>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -323,7 +592,7 @@ type GraiManageInputFieldProps = {
   placeholder?: string
   inputMode?: 'text' | 'decimal'
   suffix?: string
-  maxAmount?: string
+  allAmount?: string
   labelPosition?: 'above' | 'below'
 }
 
@@ -336,11 +605,11 @@ function GraiManageInputField({
   placeholder = '0',
   inputMode = 'text',
   suffix,
-  maxAmount,
+  allAmount,
   labelPosition = 'below',
 }: GraiManageInputFieldProps) {
   const hasSuffix = Boolean(suffix)
-  const hasMax = maxAmount !== undefined
+  const hasAll = allAmount !== undefined
   const labelNode = label ? (
     <div className={`grai-mint-amount-header${labelPosition === 'above' ? ' is-above' : ''}`}>
       <GraiFieldLabel icon={labelIcon}>{label}</GraiFieldLabel>
@@ -350,7 +619,7 @@ function GraiManageInputField({
   return (
     <div className="grai-mint-amount-field">
       {labelPosition === 'above' && labelNode}
-      <div className={`grai-input-with-suffix${hasSuffix || hasMax ? ' has-max' : ''}`}>
+      <div className={`grai-input-with-suffix${hasSuffix || hasAll ? ' has-max' : ''}`}>
         <input
           id={id}
           type="text"
@@ -363,16 +632,16 @@ function GraiManageInputField({
           autoComplete="off"
         />
         {suffix && <span className="grai-input-suffix">{suffix}</span>}
-        {hasMax && (
+        {hasAll && (
           <button
             type="button"
             className="grai-input-max-btn"
             onClick={() => {
-              if (maxAmount) onChange(maxAmount)
+              if (allAmount) onChange(allAmount)
             }}
-            disabled={!maxAmount}
+            disabled={!allAmount}
           >
-            MAX
+            ALL
           </button>
         )}
       </div>
@@ -389,16 +658,38 @@ function GraiManagePage() {
     useGraiVaultBalances()
   const solanaWallet = useSolanaWallet()
 
-  const [selectedAssetMint, setSelectedAssetMint] = useState('')
+  const [allocateAssetMint, setAllocateAssetMint] = useState('')
+  const [distributeAssetMint, setDistributeAssetMint] = useState('')
   const [allocateAssetMenuOpen, setAllocateAssetMenuOpen] = useState(false)
   const [distributeAssetMenuOpen, setDistributeAssetMenuOpen] = useState(false)
-  const [custodyWallet, setCustodyWallet] = useState('')
+  const [allocateCustodyMenuOpen, setAllocateCustodyMenuOpen] = useState(false)
+  const [distributeCustodyMenuOpen, setDistributeCustodyMenuOpen] = useState(false)
+  const [allocateCustodyWallet, setAllocateCustodyWallet] = useState('')
+  const [distributeCustodyWallet, setDistributeCustodyWallet] = useState('')
+  const [selectedAllocateCustodyGrinderId, setSelectedAllocateCustodyGrinderId] = useState('')
+  const [selectedDistributeCustodyGrinderId, setSelectedDistributeCustodyGrinderId] = useState('')
+  const [activeCustodyTarget, setActiveCustodyTarget] = useState<'allocate' | 'distribute'>('distribute')
   const [allocateAmount, setAllocateAmount] = useState('')
   const [distributeAmount, setDistributeAmount] = useState('')
-  const [assetDecimals, setAssetDecimals] = useState(9)
+  const [allocateAssetDecimals, setAllocateAssetDecimals] = useState(9)
+  const [distributeAssetDecimals, setDistributeAssetDecimals] = useState(9)
   const [protocolAuthority, setProtocolAuthority] = useState<string | null>(null)
   const [protocolAuthorityError, setProtocolAuthorityError] = useState<string | null>(null)
   const [protocolAuthorityCopied, setProtocolAuthorityCopied] = useState(false)
+  const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
+  const [isCustodyTableHidden, setIsCustodyTableHidden] = useState(false)
+  const [isJuniorVaultTableHidden, setIsJuniorVaultTableHidden] = useState(false)
+  const [walletWarningDismissed, setWalletWarningDismissed] = useState(false)
+
+  const copyGrinderAddress = useCallback(async (wallet: string, grinderId: string) => {
+    try {
+      await navigator.clipboard.writeText(wallet)
+      setCopiedGrinderId(grinderId)
+      window.setTimeout(() => setCopiedGrinderId(null), 1500)
+    } catch {
+      // ignore clipboard errors
+    }
+  }, [])
 
   const copyProtocolAuthority = useCallback(async () => {
     if (!protocolAuthority) return
@@ -429,14 +720,14 @@ function GraiManagePage() {
     isDistributing,
   } = useGraiDistribute()
 
-  const selectedAsset = assets.find((asset) => asset.mint === selectedAssetMint) ?? assets[0]
+  const allocateAsset = assets.find((asset) => asset.mint === allocateAssetMint) ?? assets[0]
 
   const allocateMaxAmount = useMemo(() => {
-    if (!selectedAsset?.mint) return ''
-    const vault = vaultBalances[selectedAsset.mint]
+    if (!allocateAsset?.mint) return ''
+    const vault = vaultBalances[allocateAsset.mint]
     if (!vault || vault.juniorRaw <= 0n) return ''
     return formatTokenBalance(vault.juniorRaw, vault.decimals)
-  }, [selectedAsset?.mint, vaultBalances])
+  }, [allocateAsset?.mint, vaultBalances])
 
   const juniorVaultRows = useMemo(
     () =>
@@ -460,30 +751,40 @@ function GraiManagePage() {
   }, [assetsLoading, juniorVaultRows, vaultBalancesLoading])
 
   useEffect(() => {
-    if (!selectedAssetMint && assets.length > 0) {
-      setSelectedAssetMint(assets[0]!.mint)
-    }
-  }, [assets, selectedAssetMint])
+    if (assets.length === 0) return
+    if (!allocateAssetMint) setAllocateAssetMint(assets[0]!.mint)
+  }, [assets, allocateAssetMint])
 
   useEffect(() => {
-    if (!connection || !selectedAsset?.mint) {
-      setAssetDecimals(9)
+    if (!connection) {
+      setAllocateAssetDecimals(9)
+      setDistributeAssetDecimals(9)
       return
     }
 
     let cancelled = false
-    void fetchMintDecimals(connection, new PublicKey(selectedAsset.mint))
-      .then((decimals) => {
-        if (!cancelled) setAssetDecimals(decimals)
-      })
-      .catch(() => {
-        if (!cancelled) setAssetDecimals(9)
-      })
+
+    const loadDecimals = async (mint: string | undefined, setDecimals: (value: number) => void) => {
+      if (!mint) {
+        setDecimals(9)
+        return
+      }
+
+      try {
+        const decimals = await fetchMintDecimals(connection, new PublicKey(mint))
+        if (!cancelled) setDecimals(decimals)
+      } catch {
+        if (!cancelled) setDecimals(9)
+      }
+    }
+
+    void loadDecimals(allocateAsset?.mint, setAllocateAssetDecimals)
+    void loadDecimals(distributeAssetMint || undefined, setDistributeAssetDecimals)
 
     return () => {
       cancelled = true
     }
-  }, [connection, selectedAsset?.mint])
+  }, [allocateAsset?.mint, connection, distributeAssetMint])
 
   useEffect(() => {
     if (!connection || !solana) {
@@ -515,9 +816,10 @@ function GraiManagePage() {
 
   const connectedWallet = solanaWallet.publicKey?.toBase58() ?? null
   const {
+    balances: custodyBalances,
     error: custodyBalancesError,
     refresh: refreshCustodyBalances,
-  } = useCustodyWalletBalances(custodyWallet, connectedWallet)
+  } = useCustodyWalletBalances(distributeCustodyWallet, connectedWallet)
 
   const {
     rows: grinderCustodyRows,
@@ -526,53 +828,118 @@ function GraiManagePage() {
     refresh: refreshGrinderCustodyBalances,
   } = useGrindersCustodyBalances(KNOWN_GRINDERS)
 
-  const custodyAssetRows = useMemo(
+  const selectedDistributeGrinder = useMemo(
     () =>
-      grinderCustodyRows.flatMap((grinder) => {
-        if (assets.length === 0) {
-          return [
-            {
-              key: grinder.id,
-              grinder,
-              asset: null as GraiAsset | null,
-              balance: '—',
-              yield: '—',
-            },
-          ]
-        }
+      findSelectedGrinder(
+        grinderCustodyRows,
+        selectedDistributeCustodyGrinderId,
+        distributeCustodyWallet,
+      ),
+    [distributeCustodyWallet, grinderCustodyRows, selectedDistributeCustodyGrinderId],
+  )
 
-        return assets.map((asset) => {
-          const entry = grinder.balances[asset.mint]
-          return {
-            key: `${grinder.id}-${asset.mint}`,
-            grinder,
-            asset,
-            balance: entry
-              ? formatVaultBalanceDisplay(entry.balanceRaw, entry.decimals)
-              : '—',
-            yield: entry ? formatVaultBalanceDisplay(entry.yieldRaw, entry.decimals) : '—',
-          }
-        })
+  const distributeGrinderAssets = useMemo(() => {
+    if (!selectedDistributeGrinder) return []
+    const graiAssetMints = new Set(assets.map((asset) => asset.mint))
+    return grinderHeldAssets(selectedDistributeGrinder)
+      .filter((row) => graiAssetMints.has(row.asset.mint))
+      .map((row) => row.asset)
+  }, [assets, selectedDistributeGrinder])
+
+  const distributeAsset =
+    distributeGrinderAssets.find((asset) => asset.mint === distributeAssetMint) ?? distributeGrinderAssets[0]
+
+  const distributeAllAmount = useMemo(() => {
+    if (!distributeAsset?.mint || !distributeCustodyWallet.trim()) return ''
+    const entry = custodyBalances[distributeAsset.mint]
+    if (!entry || entry.yieldRaw <= 0n) return ''
+    return formatTokenBalance(entry.yieldRaw, entry.decimals)
+  }, [distributeAsset?.mint, distributeCustodyWallet, custodyBalances])
+
+  useEffect(() => {
+    if (distributeGrinderAssets.length === 0) {
+      if (distributeAssetMint) {
+        setDistributeAssetMint('')
+        resetDistribute()
+      }
+      return
+    }
+
+    if (!distributeAssetMint || !distributeGrinderAssets.some((asset) => asset.mint === distributeAssetMint)) {
+      setDistributeAssetMint(distributeGrinderAssets[0]!.mint)
+      resetDistribute()
+    }
+  }, [distributeAssetMint, distributeGrinderAssets, resetDistribute])
+
+  const custodyPickerGrinders = useMemo(
+    () =>
+      KNOWN_GRINDERS.map((config) => {
+        const row = grinderCustodyRows.find((entry) => entry.id === config.id)
+        const custodyWallet = row?.custodyWallet ?? null
+        return {
+          id: config.id,
+          name: config.name,
+          custodyWallet,
+          custodyWalletAddress: grinderCustodyAddress(config, custodyWallet),
+          balances: row?.balances ?? {},
+          holdings: row?.holdings ?? [],
+        }
       }),
-    [assets, grinderCustodyRows],
+    [grinderCustodyRows],
+  )
+
+  const custodyGrinderRows = useMemo(
+    () =>
+      grinderCustodyRows.map((grinder) => ({
+        key: grinder.id,
+        grinder,
+        held: grinderHeldAssets(grinder),
+      })),
+    [grinderCustodyRows],
   )
 
   const authorityMatches =
     protocolAuthority && connectedWallet ? protocolAuthority === connectedWallet : false
 
-  const handleAssetSelect = (mint: string) => {
-    setSelectedAssetMint(mint)
+  const distributeConnectedWalletLabel = useMemo(() => {
+    if (!connectedWallet) return 'not connected'
+    if (distributeCustodyWallet.trim() && connectedWallet === distributeCustodyWallet.trim()) {
+      return 'custody wallet'
+    }
+    if (protocolAuthority && connectedWallet === protocolAuthority) {
+      return 'custody manager'
+    }
+    return 'not custody wallet or manager'
+  }, [connectedWallet, distributeCustodyWallet, protocolAuthority])
+
+  const allocateWalletWarning = Boolean(connectedWallet && !authorityMatches)
+  const distributeWalletWarning = Boolean(
+    connectedWallet &&
+      distributeConnectedWalletLabel !== 'custody wallet' &&
+      distributeConnectedWalletLabel !== 'custody manager',
+  )
+
+  useEffect(() => {
+    setWalletWarningDismissed(false)
+  }, [connectedWallet, authorityMatches, distributeConnectedWalletLabel])
+
+  const handleAllocateAssetSelect = (mint: string) => {
+    setAllocateAssetMint(mint)
     resetAllocate()
+  }
+
+  const handleDistributeAssetSelect = (mint: string) => {
+    setDistributeAssetMint(mint)
     resetDistribute()
   }
 
   const handleAllocate = async () => {
-    if (!selectedAsset?.mint) return
+    if (!allocateAsset?.mint) return
     resetAllocate()
     try {
       await allocate({
-        assetMint: selectedAsset.mint,
-        custodyWallet,
+        assetMint: allocateAsset.mint,
+        custodyWallet: allocateCustodyWallet,
         amountInput: allocateAmount,
       })
       void refreshVaultBalances()
@@ -584,11 +951,11 @@ function GraiManagePage() {
   }
 
   const handleDistribute = async () => {
-    if (!selectedAsset?.mint) return
+    if (!distributeAsset?.mint) return
     resetDistribute()
     try {
       await distribute({
-        assetMint: selectedAsset.mint,
+        assetMint: distributeAsset.mint,
         amountInput: distributeAmount,
       })
       void refreshVaultBalances()
@@ -599,15 +966,72 @@ function GraiManagePage() {
     }
   }
 
-  const handleGrinderSelect = (wallet: string | null) => {
-    if (!wallet) return
-    setCustodyWallet(wallet)
-    resetAllocate()
-  }
+  const handleAllocateCustodyGrinderSelect = useCallback(
+    (grinder: GrinderCustodyState) => {
+      setSelectedAllocateCustodyGrinderId(grinder.id)
+      if (grinder.custodyWalletAddress) {
+        setAllocateCustodyWallet(grinder.custodyWalletAddress)
+      }
+      resetAllocate()
+    },
+    [resetAllocate],
+  )
+
+  const handleDistributeCustodyGrinderSelect = useCallback(
+    (grinder: GrinderCustodyState) => {
+      setSelectedDistributeCustodyGrinderId(grinder.id)
+      if (grinder.custodyWalletAddress) {
+        setDistributeCustodyWallet(grinder.custodyWalletAddress)
+      }
+      resetDistribute()
+    },
+    [resetDistribute],
+  )
+
+  const handleAllocateCustodyWalletChange = useCallback(
+    (wallet: string) => {
+      setAllocateCustodyWallet(wallet)
+      const trimmed = wallet.trim()
+      const matched = custodyPickerGrinders.find(
+        (grinder) =>
+          grinder.custodyWalletAddress === trimmed ||
+          grinder.custodyWallet?.toBase58() === trimmed,
+      )
+      setSelectedAllocateCustodyGrinderId(matched?.id ?? '')
+      resetAllocate()
+    },
+    [custodyPickerGrinders, resetAllocate],
+  )
+
+  const handleDistributeCustodyWalletChange = useCallback(
+    (wallet: string) => {
+      setDistributeCustodyWallet(wallet)
+      const trimmed = wallet.trim()
+      const matched = custodyPickerGrinders.find(
+        (grinder) =>
+          grinder.custodyWalletAddress === trimmed ||
+          grinder.custodyWallet?.toBase58() === trimmed,
+      )
+      setSelectedDistributeCustodyGrinderId(matched?.id ?? '')
+      resetDistribute()
+    },
+    [custodyPickerGrinders, resetDistribute],
+  )
+
+  const handleCustodyTableGrinderSelect = useCallback(
+    (grinder: GrinderCustodyState) => {
+      if (activeCustodyTarget === 'allocate') {
+        handleAllocateCustodyGrinderSelect(grinder)
+      } else {
+        handleDistributeCustodyGrinderSelect(grinder)
+      }
+    },
+    [activeCustodyTarget, handleAllocateCustodyGrinderSelect, handleDistributeCustodyGrinderSelect],
+  )
 
   return (
     <div className="grai-manage-page">
-      <header className="grai-manage-header">
+      <header className="grai-page-header grai-manage-header">
         <button type="button" className="grai-manage-back" onClick={() => navigateTo('/grai')}>
           <span className="grai-manage-back-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -623,17 +1047,17 @@ function GraiManagePage() {
       )}
 
       {protocolAuthority && (
-        <p className="grai-manage-protocol-info">
-          Protocol authority:{' '}
+        <p className="grai-page-ca grai-manage-protocol-info">
+          <span className="grai-page-ca-label">Protocol authority:</span>{' '}
           <a
             href={solscanAccountUrl(protocolAuthority)}
             target="_blank"
             rel="noreferrer"
-            className="grai-manage-protocol-link"
+            className="grai-page-ca-link"
             title={protocolAuthority}
           >
-            <code
-              className={protocolAuthorityCopied ? 'is-copied' : ''}
+            <span
+              className={`grai-page-ca-link-text${protocolAuthorityCopied ? ' is-copied' : ''}`}
               role="button"
               tabIndex={0}
               title={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy address'}
@@ -652,8 +1076,8 @@ function GraiManagePage() {
               }}
             >
               {protocolAuthorityCopied ? 'Copied!' : protocolAuthority}
-            </code>
-            <span className="grai-manage-protocol-link-icon" aria-hidden="true">
+            </span>
+            <span className="grai-page-ca-link-icon" aria-hidden="true">
               {MINT_ASSET_SOLSCAN_ICON}
             </span>
           </a>
@@ -672,16 +1096,48 @@ function GraiManagePage() {
             info="Move tokens from the junior vault to a grinder custody wallet. Must be signed by the protocol authority."
           />
 
+          <p
+            className={`grai-manage-hint${allocateWalletWarning ? ' is-wallet-warning' : ''}${
+              allocateWalletWarning && walletWarningDismissed ? ' is-wallet-warning-acknowledged' : ''
+            }`}
+          >
+            <span>
+              Connected wallet:{' '}
+              {!connectedWallet ? (
+                'not connected'
+              ) : (
+                <span className="grai-manage-hint-wallet">
+                  <code>{shortenAddress(connectedWallet)}</code>
+                  {' — '}
+                  <span className="grai-manage-hint-status">
+                    {authorityMatches ? 'protocol authority' : 'not protocol authority'}
+                  </span>
+                </span>
+              )}
+            </span>
+            {allocateWalletWarning && !walletWarningDismissed ? (
+              <button
+                type="button"
+                className="grai-manage-hint-ok"
+                onClick={() => setWalletWarningDismissed(true)}
+                aria-label="Dismiss wallet warning"
+              >
+                OK
+              </button>
+            ) : null}
+          </p>
+
           <GraiManageAssetField
             assets={assets}
-            selectedAsset={selectedAsset}
+            selectedAsset={allocateAsset}
             isLoading={assetsLoading}
             error={assetsError}
             menuOpen={allocateAssetMenuOpen}
             onMenuOpenChange={setAllocateAssetMenuOpen}
-            onSelect={handleAssetSelect}
+            onSelect={handleAllocateAssetSelect}
             solscanTokenUrl={solscanTokenUrl}
             listId="grai-allocate-asset-list"
+            label="Junior vault asset"
           />
 
           <GraiManageInputField
@@ -691,41 +1147,27 @@ function GraiManagePage() {
             labelPosition="above"
             value={allocateAmount}
             inputMode="decimal"
-            suffix={selectedAsset?.symbol ?? '—'}
-            maxAmount={allocateMaxAmount}
+            suffix={allocateAsset?.symbol ?? '—'}
+            allAmount={allocateMaxAmount}
             onChange={(value) => {
-              setAllocateAmount(normalizeDecimalInput(value, assetDecimals))
+              setAllocateAmount(normalizeDecimalInput(value, allocateAssetDecimals))
               resetAllocate()
             }}
           />
 
-          <GraiManageInputField
+          <GraiManageCustodyField
             id="grai-allocate-custody"
-            label="Custody"
-            labelIcon={CUSTODY_FIELD_ICON}
-            labelPosition="above"
-            value={custodyWallet}
-            placeholder="Grinder wallet pubkey"
-            onChange={(value) => {
-              setCustodyWallet(value)
-              resetAllocate()
-            }}
+            grinders={custodyPickerGrinders}
+            selectedWallet={allocateCustodyWallet}
+            selectedGrinderId={selectedAllocateCustodyGrinderId}
+            onChange={handleAllocateCustodyWalletChange}
+            onSelectGrinder={handleAllocateCustodyGrinderSelect}
+            onFocus={() => setActiveCustodyTarget('allocate')}
+            menuOpen={allocateCustodyMenuOpen}
+            onMenuOpenChange={setAllocateCustodyMenuOpen}
+            solscanAccountUrl={solscanAccountUrl}
+            listId="grai-allocate-custody-list"
           />
-
-          <p className="grai-manage-hint">
-            Connected wallet:{' '}
-            {connectedWallet ? (
-              authorityMatches ? (
-                <code>{shortenAddress(connectedWallet)}</code>
-              ) : (
-                <>
-                  <code>{shortenAddress(connectedWallet)}</code> — must match protocol authority
-                </>
-              )
-            ) : (
-              'not connected'
-            )}
-          </p>
 
           {isAllocating ? (
             <p className="grai-manage-feedback is-pending">Confirming transaction…</p>
@@ -745,8 +1187,8 @@ function GraiManagePage() {
             className="grai-manage-btn"
             disabled={
               isAllocating ||
-              !selectedAsset?.mint ||
-              !custodyWallet.trim() ||
+              !allocateAsset?.mint ||
+              !allocateCustodyWallet.trim() ||
               !allocateAmount.trim() ||
               !authorityMatches
             }
@@ -766,29 +1208,63 @@ function GraiManagePage() {
             info="Send yield from the custody wallet to senior vault and treasury. Must be signed by the custody wallet."
           />
 
-          <GraiManageInputField
+          <p
+            className={`grai-manage-hint${distributeWalletWarning ? ' is-wallet-warning' : ''}${
+              distributeWalletWarning && walletWarningDismissed ? ' is-wallet-warning-acknowledged' : ''
+            }`}
+          >
+            <span>
+              Connected wallet:{' '}
+              {!connectedWallet ? (
+                distributeConnectedWalletLabel
+              ) : (
+                <span className="grai-manage-hint-wallet">
+                  <code>{shortenAddress(connectedWallet)}</code>
+                  {' — '}
+                  <span className="grai-manage-hint-status">{distributeConnectedWalletLabel}</span>
+                </span>
+              )}
+            </span>
+            {distributeWalletWarning && !walletWarningDismissed ? (
+              <button
+                type="button"
+                className="grai-manage-hint-ok"
+                onClick={() => setWalletWarningDismissed(true)}
+                aria-label="Dismiss wallet warning"
+              >
+                OK
+              </button>
+            ) : null}
+          </p>
+
+          <GraiManageCustodyField
             id="grai-distribute-custody"
-            label="Custody"
-            labelIcon={CUSTODY_FIELD_ICON}
-            labelPosition="above"
-            value={custodyWallet}
-            placeholder="Grinder wallet pubkey"
-            onChange={(value) => {
-              setCustodyWallet(value)
-              resetDistribute()
-            }}
+            grinders={custodyPickerGrinders}
+            selectedWallet={distributeCustodyWallet}
+            selectedGrinderId={selectedDistributeCustodyGrinderId}
+            onChange={handleDistributeCustodyWalletChange}
+            onSelectGrinder={handleDistributeCustodyGrinderSelect}
+            onFocus={() => setActiveCustodyTarget('distribute')}
+            menuOpen={distributeCustodyMenuOpen}
+            onMenuOpenChange={setDistributeCustodyMenuOpen}
+            solscanAccountUrl={solscanAccountUrl}
+            listId="grai-distribute-custody-list"
           />
 
           <GraiManageAssetField
-            assets={assets}
-            selectedAsset={selectedAsset}
-            isLoading={assetsLoading}
+            assets={distributeGrinderAssets}
+            selectedAsset={distributeAsset}
+            isLoading={assetsLoading || grinderCustodyLoading}
             error={null}
             menuOpen={distributeAssetMenuOpen}
             onMenuOpenChange={setDistributeAssetMenuOpen}
-            onSelect={handleAssetSelect}
+            onSelect={handleDistributeAssetSelect}
             solscanTokenUrl={solscanTokenUrl}
             listId="grai-distribute-asset-list"
+            label="Custody asset"
+            listEmptyMessage={
+              selectedDistributeGrinder ? 'No assets for this grinder' : 'Select custody first'
+            }
           />
 
           <GraiManageInputField
@@ -798,27 +1274,13 @@ function GraiManagePage() {
             labelPosition="above"
             value={distributeAmount}
             inputMode="decimal"
-            suffix={selectedAsset?.symbol ?? '—'}
+            suffix={distributeAsset?.symbol ?? '—'}
+            allAmount={distributeAllAmount}
             onChange={(value) => {
-              setDistributeAmount(normalizeDecimalInput(value, assetDecimals))
+              setDistributeAmount(normalizeDecimalInput(value, distributeAssetDecimals))
               resetDistribute()
             }}
           />
-
-          <p className="grai-manage-hint">
-            Connected wallet:{' '}
-            {connectedWallet ? (
-              custodyWallet.trim() && connectedWallet !== custodyWallet.trim() ? (
-                <>
-                  <code>{shortenAddress(connectedWallet)}</code> — must match custody wallet
-                </>
-              ) : (
-                <code>{shortenAddress(connectedWallet)}</code>
-              )
-            ) : (
-              'connect the custody wallet'
-            )}
-          </p>
 
           {isDistributing ? (
             <p className="grai-manage-feedback is-pending">Confirming transaction…</p>
@@ -838,11 +1300,11 @@ function GraiManagePage() {
             className="grai-manage-btn is-distribute"
             disabled={
               isDistributing ||
-              !selectedAsset?.mint ||
-              !custodyWallet.trim() ||
+              !distributeAsset?.mint ||
+              !distributeCustodyWallet.trim() ||
               !distributeAmount.trim() ||
               !connectedWallet ||
-              connectedWallet !== custodyWallet.trim()
+              connectedWallet !== distributeCustodyWallet.trim()
             }
             onClick={() => {
               void handleDistribute()
@@ -856,12 +1318,45 @@ function GraiManagePage() {
       <div className="grai-manage-vaults-row">
         <section className="grai-manage-junior-vault" aria-label="Junior vault balances">
           <div className="grai-manage-junior-vault-header">
-            <h2 className="grai-manage-junior-vault-title">Junior Vault</h2>
+            <div className="grai-manage-vault-title-row">
+              <button
+                type="button"
+                className={`grai-donut-legend-toggle ${isJuniorVaultTableHidden ? 'is-collapsed' : ''}`}
+                onClick={() => setIsJuniorVaultTableHidden((hidden) => !hidden)}
+                aria-expanded={!isJuniorVaultTableHidden}
+                aria-controls="grai-manage-junior-vault-table"
+                aria-label={isJuniorVaultTableHidden ? 'Show junior vault table' : 'Hide junior vault table'}
+              >
+                <svg
+                  className="grai-donut-legend-toggle-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              <h2 className="grai-manage-junior-vault-title">
+                <span className="grai-manage-junior-vault-title-icon" aria-hidden="true">
+                  {JUNIOR_VAULT_TABLE_ICON}
+                </span>
+                Junior Vault
+              </h2>
+            </div>
             <span className="grai-manage-junior-vault-nav">
               NAV: <strong>{totalJuniorNavLabel}</strong>
             </span>
           </div>
-          <div className="grai-balance-table grai-manage-junior-vault-table" role="table">
+          {!isJuniorVaultTableHidden && (
+          <div
+            className="grai-balance-table grai-manage-junior-vault-table"
+            id="grai-manage-junior-vault-table"
+            role="table"
+          >
             <div className="grai-balance-table-row grai-balance-table-row--head" role="row">
               <div className="grai-balance-table-cell grai-balance-table-cell--head grai-balance-table-cell--asset is-asset" role="columnheader">
                 <span className="grai-balance-table-col-icon">{ASSET_FIELD_ICON}</span>
@@ -913,6 +1408,7 @@ function GraiManagePage() {
               ))
             )}
           </div>
+          )}
           {vaultBalancesError && (
             <p className="grai-manage-feedback is-error">{vaultBalancesError}</p>
           )}
@@ -920,10 +1416,43 @@ function GraiManagePage() {
 
         <section className="grai-manage-custody-vault" aria-label="Custody balances">
           <div className="grai-manage-junior-vault-header">
-            <h2 className="grai-manage-junior-vault-title">Custodies</h2>
+            <div className="grai-manage-vault-title-row">
+              <button
+                type="button"
+                className={`grai-donut-legend-toggle ${isCustodyTableHidden ? 'is-collapsed' : ''}`}
+                onClick={() => setIsCustodyTableHidden((hidden) => !hidden)}
+                aria-expanded={!isCustodyTableHidden}
+                aria-controls="grai-manage-custody-table"
+                aria-label={isCustodyTableHidden ? 'Show custodies table' : 'Hide custodies table'}
+              >
+                <svg
+                  className="grai-donut-legend-toggle-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              <h2 className="grai-manage-junior-vault-title">
+                <span className="grai-manage-junior-vault-title-icon" aria-hidden="true">
+                  {CUSTODY_FIELD_ICON}
+                </span>
+                Custodies
+              </h2>
+            </div>
             <span className="grai-manage-custody-wallet-link">{KNOWN_GRINDERS.length} grinders</span>
           </div>
-          <div className="grai-balance-table grai-manage-custody-vault-table" role="table">
+          {!isCustodyTableHidden && (
+          <div
+            className="grai-balance-table grai-manage-custody-vault-table"
+            id="grai-manage-custody-table"
+            role="table"
+          >
             <div className="grai-balance-table-row grai-balance-table-row--head" role="row">
               <div className="grai-balance-table-cell grai-balance-table-cell--head grai-balance-table-cell--asset is-asset" role="columnheader">
                 <span className="grai-balance-table-col-icon">{CUSTODY_FIELD_ICON}</span>
@@ -931,7 +1460,7 @@ function GraiManagePage() {
               </div>
               <div className="grai-balance-table-cell grai-balance-table-cell--head is-asset" role="columnheader">
                 <span className="grai-balance-table-col-icon">{ASSET_FIELD_ICON}</span>
-                Asset
+                Assets
               </div>
               <div className="grai-balance-table-cell grai-balance-table-cell--head is-junior" role="columnheader">
                 <span className="grai-balance-table-col-icon">{JUNIOR_VAULT_TABLE_ICON}</span>
@@ -943,22 +1472,25 @@ function GraiManagePage() {
               </div>
             </div>
             {assetsLoading || grinderCustodyLoading ? (
-              custodyAssetRows.map((row) => (
+              custodyGrinderRows.map((row) => (
                 <div className="grai-balance-table-row" role="row" key={row.key}>
                   <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                    <span className="grai-grinder-name">
-                      <span className="grai-grinder-active-dot" aria-hidden="true" />
-                      {row.grinder.name}
-                    </span>
+                    <GraiGrinderName
+                      grinder={row.grinder}
+                      copied={copiedGrinderId === row.grinder.id}
+                      onCopy={(wallet, grinderId) => {
+                        void copyGrinderAddress(wallet, grinderId)
+                      }}
+                    />
                   </div>
                   <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                    {row.asset ? row.asset.symbol : '…'}
+                    …
                   </div>
                   <div className="grai-balance-table-cell grai-balance-table-value" role="cell">…</div>
                   <div className="grai-balance-table-cell grai-balance-table-value" role="cell">…</div>
                 </div>
               ))
-            ) : custodyAssetRows.length === 0 ? (
+            ) : custodyGrinderRows.length === 0 ? (
               <div className="grai-balance-table-row" role="row">
                 <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
                   No grinders
@@ -968,58 +1500,94 @@ function GraiManagePage() {
                 <div className="grai-balance-table-cell grai-balance-table-value" role="cell">—</div>
               </div>
             ) : (
-              custodyAssetRows.map((row) => {
-                const wallet = row.grinder.custodyWallet?.toBase58() ?? null
-                const isSelected = wallet !== null && custodyWallet.trim() === wallet
+              custodyGrinderRows.map((row) => {
+                const wallet = row.grinder.custodyWalletAddress || null
+                const matchesAllocate =
+                  row.grinder.id === selectedAllocateCustodyGrinderId ||
+                  (wallet !== null && allocateCustodyWallet.trim() === wallet)
+                const matchesDistribute =
+                  row.grinder.id === selectedDistributeCustodyGrinderId ||
+                  (wallet !== null && distributeCustodyWallet.trim() === wallet)
 
                 return (
                   <div
-                    className={`grai-balance-table-row grai-manage-custody-grinder-row${isSelected ? ' is-selected' : ''}${wallet ? ' is-clickable' : ''}`}
+                    className={`grai-balance-table-row grai-manage-custody-grinder-row is-clickable${matchesAllocate ? ' is-selected-allocate' : ''}${matchesDistribute ? ' is-selected-distribute' : ''}`}
                     role="row"
                     key={row.key}
-                    onClick={wallet ? () => handleGrinderSelect(wallet) : undefined}
-                    onKeyDown={
-                      wallet
-                        ? (event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              handleGrinderSelect(wallet)
-                            }
-                          }
-                        : undefined
-                    }
-                    tabIndex={wallet ? 0 : undefined}
-                    aria-selected={isSelected}
+                    onClick={() => {
+                      const pickerGrinder = custodyPickerGrinders.find(
+                        (grinder) => grinder.id === row.grinder.id,
+                      )
+                      if (pickerGrinder) handleCustodyTableGrinderSelect(pickerGrinder)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        const pickerGrinder = custodyPickerGrinders.find(
+                          (grinder) => grinder.id === row.grinder.id,
+                        )
+                        if (pickerGrinder) handleCustodyTableGrinderSelect(pickerGrinder)
+                      }
+                    }}
+                    tabIndex={0}
+                    aria-selected={matchesAllocate || matchesDistribute}
                   >
                     <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                      <span className="grai-grinder-name">
-                        <span className="grai-grinder-active-dot" aria-hidden="true" />
-                        {row.grinder.name}
-                      </span>
+                      <GraiGrinderName
+                        grinder={row.grinder}
+                        copied={copiedGrinderId === row.grinder.id}
+                        onCopy={(wallet, grinderId) => {
+                          void copyGrinderAddress(wallet, grinderId)
+                        }}
+                      />
                     </div>
                     <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                      {row.asset ? (
-                        <span className="grai-asset-cell-token">
-                          <span className="grai-asset-cell-icon" aria-hidden="true">
-                            <img src={row.asset.icon.src} alt={row.asset.icon.alt} />
-                          </span>
-                          {row.asset.symbol}
-                        </span>
-                      ) : (
+                      {row.held.length === 0 ? (
                         '—'
+                      ) : (
+                        <div className="grai-manage-custody-held-assets">
+                          {row.held.map(({ asset, network }) => (
+                            <span className="grai-manage-custody-held-asset" key={`${network}-${asset.mint}`}>
+                              <span className="grai-asset-cell-token">
+                                <span className="grai-asset-cell-icon" aria-hidden="true">
+                                  <img src={asset.icon.src} alt={asset.icon.alt} />
+                                </span>
+                                {asset.symbol}
+                              </span>
+                              <span className="grai-manage-custody-held-network">{network}</span>
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <div className="grai-balance-table-cell grai-balance-table-value" role="cell">
-                      {row.balance}
+                      {row.held.length === 0 ? (
+                        '—'
+                      ) : (
+                        <div className="grai-manage-custody-held-values">
+                          {row.held.map(({ asset, network, balance }) => (
+                            <span key={`${network}-${asset.mint}-balance`}>{balance}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="grai-balance-table-cell grai-balance-table-value" role="cell">
-                      {row.yield}
+                      {row.held.length === 0 ? (
+                        '—'
+                      ) : (
+                        <div className="grai-manage-custody-held-values">
+                          {row.held.map(({ asset, network, yield: yieldAmount }) => (
+                            <span key={`${network}-${asset.mint}-yield`}>{yieldAmount}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
               })
             )}
           </div>
+          )}
           {(grinderCustodyError || custodyBalancesError) && (
             <p className="grai-manage-feedback is-error">{grinderCustodyError ?? custodyBalancesError}</p>
           )}

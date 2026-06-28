@@ -399,7 +399,7 @@ function GraiPage() {
           }}
           aria-expanded={isTokenFlowOpen}
           aria-controls="grai-token-flow-panel"
-          aria-label="Token flow"
+          aria-label="Flow"
         >
           <svg
             className="grai-page-info-btn-icon"
@@ -413,7 +413,7 @@ function GraiPage() {
           >
             <path d="M6 9l6 6 6-6" />
           </svg>
-          token flow
+          flow
         </button>
       </div>
 

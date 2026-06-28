@@ -10,7 +10,10 @@
   flex-direction: column;
   gap: 0.45rem;
   min-width: 0;
-  padding: 0;
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 1px dashed rgba(255, 105, 180, 0.35);
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 
 .grai-token-flow-step-head {
