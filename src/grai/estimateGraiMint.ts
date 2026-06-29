@@ -2,10 +2,10 @@ import { Connection, PublicKey } from '@solana/web3.js'
 import { fetchAccountsByKey, getAccountData } from './accountBatch'
 import type { GraiSolanaConfig } from './deployments'
 import { graiStatePda } from './deployments'
-import { decodeMintSupply, decodeSeniorVaultPriceFeed, parseTokenAmount } from './onchain'
+import { decodeMintSupply, decodeSeniorVaultMintSplit, decodeSeniorVaultPriceFeed, parseTokenAmount } from './onchain'
 import { parseOraclePriceFeed } from './oraclePrice'
 import { seniorVaultPda } from './pdas'
-import { depositValue, graiMintAmount } from './tokenomics'
+import { depositValue, graiMintAmount, mintSplit } from './tokenomics'
 
 function readU128LE(buf: Buffer, offset: number): bigint {
   let value = 0n
@@ -30,13 +30,19 @@ function tryParseDepositAmount(amountInput: string, assetDecimals: number): bigi
   }
 }
 
+export type GraiMintEstimate = {
+  graiRaw: bigint
+  seniorRaw: bigint
+  juniorRaw: bigint
+}
+
 export async function estimateGraiMintOutput(
   assetMint: PublicKey,
   amountInput: string,
   assetDecimals: number,
   connection: Connection,
   config: GraiSolanaConfig,
-): Promise<bigint | null> {
+): Promise<GraiMintEstimate | null> {
   const depositAmount = tryParseDepositAmount(amountInput, assetDecimals)
   if (depositAmount === null) return null
 
@@ -70,5 +76,9 @@ export async function estimateGraiMintOutput(
     oracle.price,
     oracle.decimals,
   )
-  return graiMintAmount(depositValueUsd, totalSupply, totalValue)
+  const graiRaw = graiMintAmount(depositValueUsd, totalSupply, totalValue)
+  const mintSplitBps = decodeSeniorVaultMintSplit(seniorVaultData)
+  const [seniorRaw, juniorRaw] = mintSplit(depositAmount, mintSplitBps)
+
+  return { graiRaw, seniorRaw, juniorRaw }
 }

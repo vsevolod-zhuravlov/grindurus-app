@@ -15,6 +15,11 @@ export function decodeSeniorVaultPriceFeed(data: Buffer): PublicKey {
   return new PublicKey(data.subarray(40, 72))
 }
 
+/** Anchor SeniorVault.mint_split (basis points) at byte 72. */
+export function decodeSeniorVaultMintSplit(data: Buffer): number {
+  return data.readUInt16LE(72)
+}
+
 export async function fetchSeniorVaultPriceFeed(
   connection: Connection,
   seniorVault: PublicKey,

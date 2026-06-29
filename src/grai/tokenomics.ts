@@ -1,5 +1,6 @@
 export const GRAI_DECIMALS = 9
 export const USD_SCALE = 9
+export const MINT_SPLIT_BPS_MAX = 10_000
 
 function pow10(decimals: number): bigint {
   return 10n ** BigInt(decimals)
@@ -48,4 +49,15 @@ export function redeemAssetAmount(
   const redeem = (graiAmount * idleAmount) / totalSupply
   if (redeem <= 0n || redeem > idleAmount) return 0n
   return redeem
+}
+
+/** `senior = amount * split_bps / 10_000`, remainder to junior vault — matches on-chain mint. */
+export function mintSplit(amount: bigint, mintSplitBps: number): [bigint, bigint] {
+  if (mintSplitBps < 0 || mintSplitBps > MINT_SPLIT_BPS_MAX) {
+    throw new Error('Invalid mint split')
+  }
+
+  const senior = (amount * BigInt(mintSplitBps)) / BigInt(MINT_SPLIT_BPS_MAX)
+  const junior = amount - senior
+  return [senior, junior]
 }
