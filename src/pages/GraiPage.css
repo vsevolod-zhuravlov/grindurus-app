@@ -197,6 +197,11 @@
   color: #e91e8c;
 }
 
+[data-theme="light"] .grai-page-ca-label,
+[data-theme="light"] .grai-page-ca-label--with-icon .grai-field-label-icon {
+  color: var(--text-primary);
+}
+
 .grai-content-row {
   width: 100%;
   display: grid;

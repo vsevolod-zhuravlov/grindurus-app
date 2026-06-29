@@ -131,10 +131,10 @@ function Header({ activeView, onViewChange, isGraiManage = false }: HeaderProps)
           <nav className="header-nav" aria-label="Product sections">
             <button
               type="button"
-              className={`header-nav-btn ${activeView === 'backtest' ? 'is-active' : ''}`}
-              onClick={() => onViewChange('backtest')}
+              className="header-nav-btn"
+              disabled
             >
-              BACKTEST
+              BACKTEST (SOON)
             </button>
             <div
               ref={graiMenuRef}

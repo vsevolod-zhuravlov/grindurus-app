@@ -88,6 +88,17 @@
   box-shadow: 0 2px 16px rgba(255, 105, 180, 0.45);
 }
 
+.header-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.header-nav-btn:disabled:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
 .header-nav-grai {
   position: relative;
   display: inline-flex;
