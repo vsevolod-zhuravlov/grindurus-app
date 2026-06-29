@@ -4,7 +4,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js'
-import type { GraiSolanaConfig } from './deployments'
+import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { fetchGraiStateFixedFields } from './graiStateCache'
 import { fetchMintDecimals, fetchSeniorVaultPriceFeed, parseTokenAmount } from './onchain'
@@ -30,7 +30,7 @@ export type BuildDistributeTransactionParams = {
   assetMint: PublicKey
   yieldAmount: bigint
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function buildDistributeTransaction({
@@ -88,7 +88,7 @@ export type ExecuteDistributeParams = {
   amountInput: string
   signTransaction: (transaction: Transaction) => Promise<Transaction>
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function executeDistribute({

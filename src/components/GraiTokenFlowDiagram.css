@@ -14,6 +14,67 @@
   border: 1px dashed rgba(255, 105, 180, 0.35);
   border-radius: 10px;
   box-sizing: border-box;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.grai-token-flow-panel.is-open .grai-token-flow-step {
+  animation: grai-token-flow-step-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.grai-token-flow-panel.is-open .grai-token-flow-step:nth-child(1) {
+  animation-delay: 0.06s;
+}
+
+.grai-token-flow-panel.is-open .grai-token-flow-step:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.grai-token-flow-panel.is-open .grai-token-flow-step:nth-child(3) {
+  animation-delay: 0.18s;
+}
+
+.grai-token-flow-panel.is-open .grai-token-flow-step:nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+@keyframes grai-token-flow-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grai-token-flow-canvas {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0;
+  overflow: hidden;
+  isolation: isolate;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.grai-token-flow-canvas.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grai-token-flow-step {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .grai-token-flow-canvas {
+    opacity: 1;
+    transition: none;
+  }
 }
 
 .grai-token-flow-step-head {
@@ -33,14 +94,6 @@
   font-size: 0.78rem;
   line-height: 1.35;
   color: var(--text-secondary);
-}
-
-.grai-token-flow-canvas {
-  width: 100%;
-  min-width: 0;
-  border-radius: 0;
-  overflow: hidden;
-  isolation: isolate;
 }
 
 .grai-token-flow-canvas .react-flow {

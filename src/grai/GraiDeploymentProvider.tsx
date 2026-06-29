@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo } from 'react'
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { Connection } from '@solana/web3.js'
 import { useWalletContext, type SolanaCluster } from '../providers/AppWalletProvider'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
@@ -7,9 +7,10 @@ import {
   createGraiConnection,
   getDefaultGraiSolanaCluster,
   GraiEvmConfig,
-  GraiSolanaConfig,
+  GraiSolanaRuntime,
   resolveGraiEvmConfig,
   resolveGraiSolanaConfig,
+  resolveGraiSolanaRuntime,
   solscanTokenUrl,
   solscanTxUrl,
   solscanAccountUrl,
@@ -18,10 +19,12 @@ import {
 type GraiDeploymentContextValue = {
   chainKind: 'solana' | 'evm' | null
   solanaCluster: SolanaCluster
-  solana: GraiSolanaConfig | null
+  solana: GraiSolanaRuntime | null
   evm: GraiEvmConfig | null
   connection: Connection | null
   isConfigured: boolean
+  isProtocolResolving: boolean
+  protocolError: string | null
   clusterMismatch: boolean
   solscanTokenUrl: (mint: string) => string
   solscanTxUrl: (signature: string) => string
@@ -35,8 +38,14 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
   const { cluster: walletCluster, isConnected } = useSolanaWallet()
 
   const solanaCluster = getDefaultGraiSolanaCluster()
-  const solana = useMemo(() => resolveGraiSolanaConfig(solanaCluster), [solanaCluster])
-  const connection = useMemo(() => (solana ? createGraiConnection(solana) : null), [solana])
+  const staticSolana = useMemo(() => resolveGraiSolanaConfig(solanaCluster), [solanaCluster])
+  const connection = useMemo(
+    () => (staticSolana ? createGraiConnection(staticSolana) : null),
+    [staticSolana],
+  )
+  const [solana, setSolana] = useState<GraiSolanaRuntime | null>(null)
+  const [isProtocolResolving, setIsProtocolResolving] = useState(false)
+  const [protocolError, setProtocolError] = useState<string | null>(null)
 
   const evm = useMemo(() => {
     if (selectedChainType !== 'evm') return null
@@ -52,18 +61,49 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
   }, [evmChain, selectedChainType])
 
   const chainKind = useMemo((): GraiDeploymentContextValue['chainKind'] => {
-    if (selectedChainType === 'solana' && solana) return 'solana'
+    if (selectedChainType === 'solana' && staticSolana) return 'solana'
     if (selectedChainType === 'evm' && evm) return 'evm'
-    if (solana) return 'solana'
+    if (staticSolana) return 'solana'
     return null
-  }, [evm, selectedChainType, solana])
+  }, [evm, selectedChainType, staticSolana])
 
   const clusterMismatch =
     selectedChainType === 'solana' && isConnected && walletCluster !== null && walletCluster !== solanaCluster
 
   useEffect(() => {
+    if (!connection || !staticSolana) {
+      setSolana(null)
+      setProtocolError(null)
+      setIsProtocolResolving(false)
+      return
+    }
+
+    let cancelled = false
+    setIsProtocolResolving(true)
+    setProtocolError(null)
     clearGraiStateCache()
-  }, [solana?.programId.toBase58(), solanaCluster])
+
+    void resolveGraiSolanaRuntime(connection, staticSolana)
+      .then((runtime) => {
+        if (!cancelled) {
+          setSolana(runtime)
+          setProtocolError(null)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSolana(null)
+          setProtocolError(error instanceof Error ? error.message : 'Failed to resolve GRAI protocol')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsProtocolResolving(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [connection, staticSolana])
 
   const value = useMemo<GraiDeploymentContextValue>(
     () => ({
@@ -73,12 +113,23 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
       evm,
       connection,
       isConfigured: chainKind === 'solana' ? solana !== null : chainKind === 'evm' ? evm !== null : false,
+      isProtocolResolving,
+      protocolError,
       clusterMismatch,
       solscanTokenUrl: (mint: string) => solscanTokenUrl(solanaCluster, mint),
       solscanTxUrl: (signature: string) => solscanTxUrl(solanaCluster, signature),
       solscanAccountUrl: (address: string) => solscanAccountUrl(solanaCluster, address),
     }),
-    [chainKind, clusterMismatch, connection, evm, solana, solanaCluster],
+    [
+      chainKind,
+      clusterMismatch,
+      connection,
+      evm,
+      isProtocolResolving,
+      protocolError,
+      solana,
+      solanaCluster,
+    ],
   )
 
   return <GraiDeploymentContext.Provider value={value}>{children}</GraiDeploymentContext.Provider>

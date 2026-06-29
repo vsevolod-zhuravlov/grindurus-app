@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { decodeTokenAccountAmount, fetchAccountsByKey, getAccountData } from './accountBatch'
 import type { GraiSolanaConfig } from './deployments'
-import { fetchGraiStateAssetMints } from './graiStateCache'
+import { fetchGraiProtocol } from './fetchGraiProtocol'
 import { decodeMintDecimals } from './onchain'
 import { NATIVE_MINT } from './knownMints'
 import { custodyAllocationPda, getAssociatedTokenAddress } from './pdas'
@@ -25,8 +25,9 @@ export async function fetchCustodyWalletBalances(
   config: GraiSolanaConfig,
   custodyWallet: PublicKey,
 ): Promise<Record<string, CustodyAssetBalances>> {
-  const assetMints = await fetchGraiStateAssetMints(connection, config)
-  const programId = config.programId
+  const protocol = await fetchGraiProtocol(connection, config.graiMint)
+  const assetMints = protocol.assetMints
+  const programId = protocol.programId
 
   const accountKeys: PublicKey[] = []
   for (const mint of assetMints) {

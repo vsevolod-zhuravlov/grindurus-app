@@ -31,6 +31,14 @@ export async function fetchSeniorVaultPriceFeed(
   return decodeSeniorVaultPriceFeed(Buffer.from(account.data))
 }
 
+/** SPL mint account: mint_authority COption<Pubkey> at offset 0. */
+export function decodeMintAuthority(data: Buffer): PublicKey | null {
+  if (data.length < 36) return null
+  const tag = data.readUInt32LE(0)
+  if (tag !== 1) return null
+  return new PublicKey(data.subarray(4, 36))
+}
+
 /** SPL mint account: supply at offset 36 (u64 LE). */
 export function decodeMintSupply(data: Buffer): bigint {
   return data.readBigUInt64LE(36)

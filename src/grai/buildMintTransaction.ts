@@ -5,7 +5,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js'
-import type { GraiSolanaConfig } from './deployments'
+import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { NATIVE_MINT } from './knownMints'
 import { fetchMintDecimals, fetchSeniorVaultPriceFeed, parseTokenAmount } from './onchain'
@@ -34,7 +34,7 @@ export type BuildMintTransactionParams = {
   assetMint: PublicKey
   amount: bigint
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function buildMintTransaction({
@@ -112,7 +112,7 @@ export type ExecuteMintParams = {
   amountInput: string
   signTransaction: (transaction: Transaction) => Promise<Transaction>
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function executeMint({

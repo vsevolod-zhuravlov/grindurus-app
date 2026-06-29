@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { readSoundEnabled, writeSoundEnabled } from '../utils/soundPreference'
 
 type Theme = 'light' | 'dark'
 
@@ -10,11 +11,16 @@ function readSavedTheme(): Theme {
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(readSavedTheme)
+  const [soundEnabled, setSoundEnabled] = useState(readSoundEnabled)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    writeSoundEnabled(soundEnabled)
+  }, [soundEnabled])
 
   return (
     <div className="theme-toggle">
@@ -40,6 +46,16 @@ export function ThemeToggle() {
         >
           <span>🌑</span>
           <span>Dark</span>
+        </button>
+        <div className="theme-dropdown-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className={`theme-option theme-option--sound${soundEnabled ? ' is-on' : ''}`}
+          onClick={() => setSoundEnabled((on) => !on)}
+          aria-pressed={soundEnabled}
+        >
+          <span>{soundEnabled ? '🔊' : '🔇'}</span>
+          <span>Sound: {soundEnabled ? 'ON' : 'OFF'}</span>
         </button>
       </div>
     </div>

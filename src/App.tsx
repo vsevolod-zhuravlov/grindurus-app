@@ -53,7 +53,7 @@ function App() {
 
   return (
     <div className="App">
-      <Header activeView={mainView} onViewChange={handleViewChange} />
+      <Header activeView={mainView} onViewChange={handleViewChange} isGraiManage={route === 'grai-manage'} />
       <main className={`App-main ${route === 'backtest' ? 'App-main--backtest' : ''}`}>
         {route === 'grai-manage' ? (
           <GraiManagePage />

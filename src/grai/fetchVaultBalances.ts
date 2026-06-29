@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { decodeTokenAccountAmount, fetchAccountsByKey, getAccountData } from './accountBatch'
 import type { GraiSolanaConfig } from './deployments'
-import { fetchGraiStateAssetMints } from './graiStateCache'
+import { fetchGraiProtocol } from './fetchGraiProtocol'
 import { decodeSeniorVaultPriceFeed, decodeSeniorVaultTotalValue, decodeMintDecimals } from './onchain'
 import { parseOraclePriceFeed } from './oraclePrice'
 import { NATIVE_MINT } from './knownMints'
@@ -19,6 +19,8 @@ export type GraiAssetVaultBalances = {
   seniorUsdRaw: bigint
   /** Junior vault idle balance priced in USD (9 decimals). */
   juniorUsdRaw: bigint
+  /** Allocated (active) balance priced in USD (9 decimals). */
+  allocatedUsdRaw: bigint
 }
 
 function decodeJuniorVaultActiveAmount(data: Buffer): bigint {
@@ -66,6 +68,7 @@ function parseAssetVaultBalances(
     navUsdRaw,
     seniorUsdRaw: 0n,
     juniorUsdRaw: 0n,
+    allocatedUsdRaw: 0n,
   }
 }
 
@@ -91,8 +94,8 @@ export async function fetchGraiVaultBalances(
   connection: Connection,
   config: GraiSolanaConfig,
 ): Promise<Record<string, GraiAssetVaultBalances>> {
-  const assetMints = await fetchGraiStateAssetMints(connection, config)
-  const programId = config.programId
+  const protocol = await fetchGraiProtocol(connection, config.graiMint)
+  const { programId, assetMints } = protocol
 
   const accountKeys: PublicKey[] = []
   for (const mint of assetMints) {
@@ -137,7 +140,13 @@ export async function fetchGraiVaultBalances(
       priceFeedKey,
       priceFeedAccounts,
     )
-    return [mint.toBase58(), { ...balances, seniorUsdRaw, juniorUsdRaw }] as const
+    const allocatedUsdRaw = priceVaultBalanceUsd(
+      balances.allocatedRaw,
+      balances.decimals,
+      priceFeedKey,
+      priceFeedAccounts,
+    )
+    return [mint.toBase58(), { ...balances, seniorUsdRaw, juniorUsdRaw, allocatedUsdRaw }] as const
   })
 
   return Object.fromEntries(entries)

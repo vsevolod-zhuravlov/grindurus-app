@@ -330,8 +330,28 @@
   gap: 0.15rem;
 }
 
-.grai-manage-card .grai-mint-asset-field + .grai-mint-amount-field {
-  margin-top: calc(-1rem + 0.15rem);
+.grai-manage-card .grai-mint-amount-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.grai-manage-card .grai-mint-amount-block .grai-mint-amount-header {
+  min-height: 0;
+}
+
+.grai-manage-card .grai-mint-amount-block .grai-mint-amount-header .grai-wallet-balance,
+.grai-manage-card .grai-mint-amount-block .grai-mint-amount-header .grai-wallet-action-slot {
+  min-height: 0;
+}
+
+.grai-manage-card .grai-mint-amount-block .grai-mint-amount-header + .grai-mint-amount-field {
+  margin-top: 0;
+}
+
+.grai-manage-card .grai-mint-amount-block .grai-mint-amount-field {
+  gap: 0;
 }
 
 .grai-manage-card .grai-mint-amount-row {
@@ -389,7 +409,7 @@
 .grai-manage-custody-field .grai-mint-asset-value.grai-mint-asset-value--combined {
   flex-direction: column;
   align-items: stretch;
-  gap: 0.2rem;
+  gap: 0;
   min-height: 0;
   padding: 0;
   border: none;
@@ -415,7 +435,9 @@
 
 .grai-manage-hint {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-secondary);
   line-height: 1.4;
   display: flex;
@@ -429,7 +451,7 @@
 }
 
 .grai-manage-hint code {
-  font-size: 0.78rem;
+  font-size: 0.95em;
   color: #ff9ed3;
 }
 
@@ -525,8 +547,29 @@
   background: linear-gradient(135deg, #7dd3fc, #34d399);
 }
 
-.grai-manage-protocol-info {
+.grai-manage-protocol-info-block {
   margin: 0 0 1rem;
+}
+
+.grai-manage-protocol-info {
+  margin: 0;
+}
+
+.grai-manage-protocol-info .grai-page-ca-label {
+  color: #fff;
+}
+
+.grai-manage-protocol-info .grai-page-ca-label--with-icon .grai-field-label-icon {
+  color: #fff;
+}
+
+[data-theme='light'] .grai-manage-protocol-info .grai-page-ca-label,
+[data-theme='light'] .grai-manage-protocol-info .grai-page-ca-label--with-icon .grai-field-label-icon {
+  color: var(--text-primary);
+}
+
+.grai-manage-protocol-info + .grai-manage-protocol-info {
+  margin-top: 0.35rem;
 }
 
 .grai-manage-protocol-info .grai-page-ca-link-text {
@@ -553,11 +596,15 @@
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
+  min-height: 26px;
   padding: 0.1rem 0;
   border: none;
   background: transparent;
-  color: #ff9ed3;
-  font: inherit;
+  color: #ff69b4;
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  text-align: left;
   outline: none;
 }
 
@@ -568,6 +615,15 @@
 
 .grai-manage-custody-input:focus {
   outline: none;
+}
+
+[data-theme='light'] .grai-manage-custody-input {
+  color: #e91e8c;
+}
+
+[data-theme='light'] .grai-manage-custody-input::placeholder {
+  color: rgba(233, 30, 140, 0.45);
+  opacity: 1;
 }
 
 .grai-manage-custody-empty {
@@ -604,6 +660,36 @@
 
 .grai-manage-custody-field .grai-mint-asset-label-text {
   align-items: center;
+  min-height: 0;
+}
+
+.grai-manage-custody-field .grai-mint-asset-label-row {
+  margin-bottom: 0;
+}
+
+.grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label,
+.grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label .grai-field-label-icon {
+  color: #fff;
+  font-size: 1.12rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label .grai-field-label-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label .grai-field-label-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+[data-theme='light'] .grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label,
+[data-theme='light'] .grai-manage-custody-field .grai-mint-asset-label-text > .grai-field-label .grai-field-label-icon {
+  color: #000;
 }
 
 .grai-manage-custody-field .grai-mint-asset-item.is-disabled {

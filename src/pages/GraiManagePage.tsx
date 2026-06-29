@@ -20,6 +20,22 @@ import { navigateTo } from '../utils/navigate'
 import './GraiPage.css'
 import './GraiManagePage.css'
 
+const PROTOCOL_AUTHORITY_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+)
+
+const TREASURY_WALLET_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 10h18" />
+    <path d="M5 10V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
+    <path d="M3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8" />
+    <path d="M16 14h.01" />
+  </svg>
+)
+
 const ASSET_FIELD_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <ellipse cx="12" cy="7" rx="8" ry="3" />
@@ -263,6 +279,20 @@ function GraiManageAssetSelector({
               : selectedAsset?.symbol ??
                 (assets.length === 0 ? (emptyTriggerLabel ?? listEmptyMessage ?? '—') : '—')}
           </span>
+          {selectedAsset?.mint && (
+            <a
+              href={solscanTokenUrl(selectedAsset.mint)}
+              target="_blank"
+              rel="noreferrer"
+              className="grai-mint-asset-value-solscan"
+              aria-label={`View ${selectedAsset.symbol} on Solscan`}
+              title={`View ${selectedAsset.symbol} on Solscan`}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              {MINT_ASSET_SOLSCAN_ICON}
+            </a>
+          )}
         </button>
         <button
           type="button"
@@ -330,75 +360,6 @@ function GraiManageAssetSelector({
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-type GraiManageAssetFieldProps = {
-  selectedAsset: GraiAsset | undefined
-  solscanTokenUrl: (mint: string) => string
-  label?: string
-  error?: string | null
-}
-
-function GraiManageAssetField({
-  selectedAsset,
-  solscanTokenUrl,
-  label = 'Asset',
-  error,
-}: GraiManageAssetFieldProps) {
-  const [addressCopied, setAddressCopied] = useState(false)
-
-  const copyMintAddress = async () => {
-    if (!selectedAsset?.mint) return
-    try {
-      await navigator.clipboard.writeText(selectedAsset.mint)
-      setAddressCopied(true)
-      window.setTimeout(() => setAddressCopied(false), 1500)
-    } catch {
-      // ignore clipboard errors
-    }
-  }
-
-  return (
-    <div className="grai-mint-asset-field">
-      <div className={`grai-mint-asset-label-row ${selectedAsset?.mint ? 'has-mint-address' : ''}`}>
-        <span className="grai-mint-asset-label-text">
-          <span className="grai-field-label grai-field-label--with-icon">
-            <span className="grai-field-label-icon">{ASSET_FIELD_ICON}</span>
-            {label}
-          </span>
-          {selectedAsset?.mint && (
-            <span className="grai-mint-asset-address-actions">
-              <span className="grai-mint-asset-short-address-wrap">
-                <span className="grai-mint-asset-full-address">{selectedAsset.mint}</span>
-                <button
-                  type="button"
-                  className={`grai-mint-asset-short-address ${addressCopied ? 'is-copied' : ''}`}
-                  onClick={() => {
-                    void copyMintAddress()
-                  }}
-                  title={addressCopied ? 'Copied to clipboard' : 'Copy mint address'}
-                  aria-label={`Copy ${selectedAsset.symbol} mint address`}
-                >
-                  {addressCopied ? 'Copied!' : shortenAddress(selectedAsset.mint)}
-                </button>
-              </span>
-              <a
-                href={solscanTokenUrl(selectedAsset.mint)}
-                target="_blank"
-                rel="noreferrer"
-                className="grai-mint-asset-trigger-solscan"
-                aria-label={`View ${selectedAsset.symbol} on Solscan`}
-                title={`View ${selectedAsset.symbol} on Solscan`}
-              >
-                {MINT_ASSET_SOLSCAN_ICON}
-              </a>
-            </span>
-          )}
-        </span>
-      </div>
-      {error && <p className="grai-registry-hint is-error">{error}</p>}
     </div>
   )
 }
@@ -588,16 +549,35 @@ function GraiManageCustodyField({
   )
 }
 
+function GraiVaultBalanceSlot({ amount, symbol }: { amount: string; symbol?: string }) {
+  return (
+    <span className="grai-wallet-action-slot">
+      <span className="grai-wallet-balance">
+        {amount ? (
+          <>
+            <span className="grai-wallet-balance-amount">{amount}</span>
+            {symbol ? <span className="grai-wallet-balance-symbol"> {symbol}</span> : null}
+          </>
+        ) : (
+          '—'
+        )}
+      </span>
+    </span>
+  )
+}
+
 type GraiManageInputFieldProps = {
   id: string
   label?: string
   labelIcon?: ReactNode
+  header?: ReactNode
   value: string
   onChange: (value: string) => void
   placeholder?: string
   inputMode?: 'text' | 'decimal'
   suffix?: string
   allAmount?: string
+  maxLabel?: string
   labelPosition?: 'above' | 'below'
   trailing?: ReactNode
 }
@@ -606,12 +586,14 @@ function GraiManageInputField({
   id,
   label,
   labelIcon,
+  header,
   value,
   onChange,
   placeholder = '0',
   inputMode = 'text',
   suffix,
   allAmount,
+  maxLabel = 'MAX',
   labelPosition = 'below',
   trailing,
 }: GraiManageInputFieldProps) {
@@ -646,13 +628,13 @@ function GraiManageInputField({
           }}
           disabled={!allAmount}
         >
-          ALL
+          {maxLabel}
         </button>
       )}
     </div>
   )
 
-  return (
+  const amountField = (
     <div className="grai-mint-amount-field">
       {labelPosition === 'above' && labelNode}
       {trailing ? (
@@ -666,6 +648,17 @@ function GraiManageInputField({
       {labelPosition === 'below' && labelNode}
     </div>
   )
+
+  if (header) {
+    return (
+      <div className="grai-mint-amount-block">
+        {header}
+        {amountField}
+      </div>
+    )
+  }
+
+  return amountField
 }
 
 function GraiManagePage() {
@@ -692,8 +685,10 @@ function GraiManagePage() {
   const [allocateAssetDecimals, setAllocateAssetDecimals] = useState(9)
   const [distributeAssetDecimals, setDistributeAssetDecimals] = useState(9)
   const [protocolAuthority, setProtocolAuthority] = useState<string | null>(null)
+  const [treasuryWallet, setTreasuryWallet] = useState<string | null>(null)
   const [protocolAuthorityError, setProtocolAuthorityError] = useState<string | null>(null)
   const [protocolAuthorityCopied, setProtocolAuthorityCopied] = useState(false)
+  const [treasuryWalletCopied, setTreasuryWalletCopied] = useState(false)
   const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
   const [isCustodyTableHidden, setIsCustodyTableHidden] = useState(false)
   const [isJuniorVaultTableHidden, setIsJuniorVaultTableHidden] = useState(false)
@@ -719,6 +714,17 @@ function GraiManagePage() {
       // ignore clipboard errors
     }
   }, [protocolAuthority])
+
+  const copyTreasuryWallet = useCallback(async () => {
+    if (!treasuryWallet) return
+    try {
+      await navigator.clipboard.writeText(treasuryWallet)
+      setTreasuryWalletCopied(true)
+      window.setTimeout(() => setTreasuryWalletCopied(false), 1500)
+    } catch {
+      // ignore clipboard errors
+    }
+  }, [treasuryWallet])
 
   const {
     allocate,
@@ -807,6 +813,7 @@ function GraiManagePage() {
   useEffect(() => {
     if (!connection || !solana) {
       setProtocolAuthority(null)
+      setTreasuryWallet(null)
       return
     }
 
@@ -815,12 +822,14 @@ function GraiManagePage() {
       .then((fields) => {
         if (!cancelled) {
           setProtocolAuthority(fields.authority.toBase58())
+          setTreasuryWallet(fields.treasuryWallet.toBase58())
           setProtocolAuthorityError(null)
         }
       })
       .catch((error) => {
         if (!cancelled) {
           setProtocolAuthority(null)
+          setTreasuryWallet(null)
           setProtocolAuthorityError(
             error instanceof Error ? error.message : 'Failed to load protocol authority',
           )
@@ -1064,42 +1073,93 @@ function GraiManagePage() {
         <p className="grai-manage-feedback is-error">GRAI is not configured for this network.</p>
       )}
 
-      {protocolAuthority && (
-        <p className="grai-page-ca grai-manage-protocol-info">
-          <span className="grai-page-ca-label">Protocol authority:</span>{' '}
-          <a
-            href={solscanAccountUrl(protocolAuthority)}
-            target="_blank"
-            rel="noreferrer"
-            className="grai-page-ca-link"
-            title={protocolAuthority}
-          >
-            <span
-              className={`grai-page-ca-link-text${protocolAuthorityCopied ? ' is-copied' : ''}`}
-              role="button"
-              tabIndex={0}
-              title={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy address'}
-              aria-label={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy protocol authority address'}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                void copyProtocolAuthority()
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  void copyProtocolAuthority()
-                }
-              }}
-            >
-              {protocolAuthorityCopied ? 'Copied!' : protocolAuthority}
-            </span>
-            <span className="grai-page-ca-link-icon" aria-hidden="true">
-              {MINT_ASSET_SOLSCAN_ICON}
-            </span>
-          </a>
-        </p>
+      {(protocolAuthority || treasuryWallet) && (
+        <div className="grai-manage-protocol-info-block">
+          {protocolAuthority && (
+            <p className="grai-page-ca grai-manage-protocol-info">
+              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
+                <span className="grai-field-label-icon" aria-hidden="true">
+                  {PROTOCOL_AUTHORITY_ICON}
+                </span>
+                Protocol authority:
+              </span>{' '}
+              <a
+                href={solscanAccountUrl(protocolAuthority)}
+                target="_blank"
+                rel="noreferrer"
+                className="grai-page-ca-link"
+                title={protocolAuthority}
+              >
+                <span
+                  className={`grai-page-ca-link-text${protocolAuthorityCopied ? ' is-copied' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  title={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy address'}
+                  aria-label={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy protocol authority address'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void copyProtocolAuthority()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void copyProtocolAuthority()
+                    }
+                  }}
+                >
+                  {protocolAuthorityCopied ? 'Copied!' : protocolAuthority}
+                </span>
+                <span className="grai-page-ca-link-icon" aria-hidden="true">
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </span>
+              </a>
+            </p>
+          )}
+          {treasuryWallet && (
+            <p className="grai-page-ca grai-manage-protocol-info">
+              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
+                <span className="grai-field-label-icon" aria-hidden="true">
+                  {TREASURY_WALLET_ICON}
+                </span>
+                Treasury wallet:
+              </span>{' '}
+              <a
+                href={solscanAccountUrl(treasuryWallet)}
+                target="_blank"
+                rel="noreferrer"
+                className="grai-page-ca-link"
+                title={treasuryWallet}
+              >
+                <span
+                  className={`grai-page-ca-link-text${treasuryWalletCopied ? ' is-copied' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  title={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy address'}
+                  aria-label={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy treasury wallet address'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void copyTreasuryWallet()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void copyTreasuryWallet()
+                    }
+                  }}
+                >
+                  {treasuryWalletCopied ? 'Copied!' : treasuryWallet}
+                </span>
+                <span className="grai-page-ca-link-icon" aria-hidden="true">
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </span>
+              </a>
+            </p>
+          )}
+        </div>
       )}
       {protocolAuthorityError && (
         <p className="grai-manage-feedback is-error">{protocolAuthorityError}</p>
@@ -1120,7 +1180,7 @@ function GraiManagePage() {
             }`}
           >
             <span>
-              Connected wallet:{' '}
+              Wallet:{' '}
               {!connectedWallet ? (
                 'not connected'
               ) : (
@@ -1145,15 +1205,28 @@ function GraiManagePage() {
             ) : null}
           </p>
 
-          <GraiManageAssetField
-            selectedAsset={allocateAsset}
-            error={assetsError}
-            solscanTokenUrl={solscanTokenUrl}
-            label="Junior vault asset"
+          <GraiManageCustodyField
+            id="grai-allocate-custody"
+            grinders={custodyPickerGrinders}
+            selectedWallet={allocateCustodyWallet}
+            selectedGrinderId={selectedAllocateCustodyGrinderId}
+            onChange={handleAllocateCustodyWalletChange}
+            onSelectGrinder={handleAllocateCustodyGrinderSelect}
+            onFocus={() => setActiveCustodyTarget('allocate')}
+            menuOpen={allocateCustodyMenuOpen}
+            onMenuOpenChange={setAllocateCustodyMenuOpen}
+            solscanAccountUrl={solscanAccountUrl}
+            listId="grai-allocate-custody-list"
           />
 
           <GraiManageInputField
             id="grai-allocate-amount"
+            header={
+              <div className="grai-mint-amount-header">
+                <GraiFieldLabel icon={ASSET_FIELD_ICON}>Junior vault balance</GraiFieldLabel>
+                <GraiVaultBalanceSlot amount={allocateMaxAmount} symbol={allocateAsset?.symbol} />
+              </div>
+            }
             value={allocateAmount}
             inputMode="decimal"
             allAmount={allocateMaxAmount}
@@ -1174,20 +1247,7 @@ function GraiManagePage() {
               />
             }
           />
-
-          <GraiManageCustodyField
-            id="grai-allocate-custody"
-            grinders={custodyPickerGrinders}
-            selectedWallet={allocateCustodyWallet}
-            selectedGrinderId={selectedAllocateCustodyGrinderId}
-            onChange={handleAllocateCustodyWalletChange}
-            onSelectGrinder={handleAllocateCustodyGrinderSelect}
-            onFocus={() => setActiveCustodyTarget('allocate')}
-            menuOpen={allocateCustodyMenuOpen}
-            onMenuOpenChange={setAllocateCustodyMenuOpen}
-            solscanAccountUrl={solscanAccountUrl}
-            listId="grai-allocate-custody-list"
-          />
+          {assetsError && <p className="grai-registry-hint is-error">{assetsError}</p>}
 
           {isAllocating ? (
             <p className="grai-manage-feedback is-pending">Confirming transaction…</p>
@@ -1234,7 +1294,7 @@ function GraiManagePage() {
             }`}
           >
             <span>
-              Connected wallet:{' '}
+              Wallet:{' '}
               {!connectedWallet ? (
                 distributeConnectedWalletLabel
               ) : (
@@ -1271,14 +1331,14 @@ function GraiManagePage() {
             listId="grai-distribute-custody-list"
           />
 
-          <GraiManageAssetField
-            selectedAsset={distributeAsset}
-            solscanTokenUrl={solscanTokenUrl}
-            label="Custody asset"
-          />
-
           <GraiManageInputField
             id="grai-distribute-amount"
+            header={
+              <div className="grai-mint-amount-header">
+                <GraiFieldLabel icon={ASSET_FIELD_ICON}>Custody balance</GraiFieldLabel>
+                <GraiVaultBalanceSlot amount={distributeAllAmount} symbol={distributeAsset?.symbol} />
+              </div>
+            }
             value={distributeAmount}
             inputMode="decimal"
             allAmount={distributeAllAmount}

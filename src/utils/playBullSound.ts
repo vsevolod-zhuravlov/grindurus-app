@@ -1,3 +1,5 @@
+import { readSoundEnabled } from './soundPreference'
+
 const BULL_SOUND_SRC = '/byk-mychit.mp3'
 
 let bullAudio: HTMLAudioElement | null = null
@@ -14,6 +16,8 @@ function getBullAudio(): HTMLAudioElement | null {
 }
 
 export function primeBullSound() {
+  if (!readSoundEnabled()) return
+
   const audio = getBullAudio()
   if (!audio) return
 
@@ -27,6 +31,8 @@ export function primeBullSound() {
 }
 
 export async function playBullSound() {
+  if (!readSoundEnabled()) return
+
   const audio = getBullAudio()
   if (!audio) return
 

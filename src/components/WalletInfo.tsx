@@ -4,6 +4,7 @@ import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useEvmWallet } from '../hooks/useEvmWallet'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import baseNetworkIcon from '../assets/base-network.svg'
+import { WalletExpandToggle } from './WalletExpandToggle'
 import './WalletStyles.css'
 
 export function WalletInfo() {
@@ -194,17 +195,7 @@ export function WalletInfo() {
       >
         {getCurrentNetworkIcon()}
         <span className="wallet-address">{activeWallet.shortAddress}</span>
-        <svg 
-          className={`wallet-dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}
-          width="10" 
-          height="10" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2.5"
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        <WalletExpandToggle expanded={isDropdownOpen} />
       </button>
 
       {isDropdownOpen && (

@@ -13,6 +13,7 @@ type GraiNavDonutProps = {
   slices: GraiCompositionSlice[]
   totalNavLabel: string
   centerLabel: string
+  valueUnit?: string
   isLoading?: boolean
 }
 
@@ -26,7 +27,13 @@ type DonutChartEntry = {
 const TRACK_FILL = 'var(--grai-donut-track-fill)'
 const ACTIVE_SECTOR_STROKE = 'var(--grai-donut-sector-stroke)'
 
-export function GraiNavDonut({ slices, totalNavLabel, centerLabel, isLoading = false }: GraiNavDonutProps) {
+export function GraiNavDonut({
+  slices,
+  totalNavLabel,
+  centerLabel,
+  valueUnit = 'USDC',
+  isLoading = false,
+}: GraiNavDonutProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
   const { chartData, isEmptyDistribution } = useMemo((): {
@@ -151,7 +158,9 @@ export function GraiNavDonut({ slices, totalNavLabel, centerLabel, isLoading = f
       </ResponsiveContainer>
       <div className="grai-donut-center">
         <span className="grai-donut-total-label">{centerLabel}</span>
-        <span className="grai-donut-total-value">{totalNavLabel} USDC</span>
+        <span className="grai-donut-total-value">
+          {totalNavLabel} {valueUnit}
+        </span>
       </div>
     </div>
   )

@@ -1,8 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { decodeTokenAccountAmount, fetchAccountsByKey, getAccountData } from './accountBatch'
-import type { GraiSolanaConfig } from './deployments'
-import { graiStatePda } from './deployments'
-import { fetchGraiStateAssetMints } from './graiStateCache'
+import type { GraiSolanaRuntime } from './deployments'
+import { fetchGraiProtocol } from './fetchGraiProtocol'
 import { resolveGraiAsset, type GraiAsset } from './knownMints'
 import { NATIVE_MINT } from './knownMints'
 import {
@@ -55,13 +54,14 @@ export async function estimateGraiBurnOutputs(
   graiAmountInput: string,
   graiDecimals: number,
   connection: Connection,
-  config: GraiSolanaConfig,
+  config: GraiSolanaRuntime,
 ): Promise<GraiBurnOutputEstimate[] | null> {
   const graiAmount = tryParseGraiAmount(graiAmountInput, graiDecimals)
   if (graiAmount === null) return null
 
-  const graiState = graiStatePda(config.programId)
-  const assetMints = await fetchGraiStateAssetMints(connection, config)
+  const protocol = await fetchGraiProtocol(connection, config.graiMint)
+  const graiState = config.graiState
+  const assetMints = protocol.assetMints
   const programId = config.programId
 
   const accountKeys: PublicKey[] = [graiState, config.graiMint]

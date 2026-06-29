@@ -14,9 +14,6 @@ export function getDefaultGraiSolanaConfig(): GraiSolanaConfig {
   return getGraiSolanaConfigOrThrow(getDefaultGraiSolanaCluster())
 }
 
-/** @deprecated Prefer `useGraiDeployment().solana.programId` */
-export const GRAI_PROGRAM_ID = getDefaultGraiSolanaConfig().programId
-
 /** @deprecated Prefer `useGraiDeployment().connection` */
 export function createGraiRegistryConnection(config: GraiSolanaConfig = getDefaultGraiSolanaConfig()) {
   return createGraiConnection(config)
@@ -25,7 +22,7 @@ export function createGraiRegistryConnection(config: GraiSolanaConfig = getDefau
 /** @deprecated Prefer `useGraiDeployment().solana` */
 export const GRAI_REGISTRY_RPC_URL = getDefaultGraiSolanaConfig().rpcUrl
 
-export function graiStatePda(programId: PublicKey = GRAI_PROGRAM_ID): PublicKey {
+export function graiStatePda(programId: PublicKey): PublicKey {
   return graiStatePdaFromDeployment(programId)
 }
 

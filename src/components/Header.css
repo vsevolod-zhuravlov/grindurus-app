@@ -88,6 +88,162 @@
   box-shadow: 0 2px 16px rgba(255, 105, 180, 0.45);
 }
 
+.header-nav-grai {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 2px solid #ff69b4;
+  border-radius: 20px;
+  transition: all 0.25s ease;
+}
+
+.header-nav-grai:hover {
+  background: rgba(255, 105, 180, 0.12);
+  box-shadow: 0 2px 12px rgba(255, 105, 180, 0.25);
+}
+
+.header-nav-grai.is-active {
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  border-color: transparent;
+  box-shadow: 0 2px 16px rgba(255, 105, 180, 0.45);
+}
+
+.header-nav-grai-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem 0.5rem 0.2rem;
+  border: 0;
+  background: transparent;
+  color: #ff69b4;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.header-nav-grai.is-active .header-nav-grai-label {
+  color: #fff;
+}
+
+.header-nav-grai-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 0.35rem 0 0.35rem;
+}
+
+.header-nav-grai-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.header-nav-grai-toggle:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 105, 180, 0.45);
+  background: rgba(255, 105, 180, 0.08);
+}
+
+.header-nav-grai.is-active .header-nav-grai-toggle {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.header-nav-grai.is-active .header-nav-grai-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.header-nav-grai-toggle-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  transition: transform 0.22s ease;
+}
+
+.header-nav-grai-toggle.is-collapsed .header-nav-grai-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.header-nav-grai-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 8.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  z-index: 120;
+}
+
+.header-nav-grai-dropdown.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.header-nav-grai-dropdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.header-nav-grai-dropdown-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.header-nav-grai-dropdown-item.is-active {
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  color: #fff;
+}
+
+.header-nav-grai-dropdown-item-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.header-nav-grai-dropdown-item-icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -186,6 +342,17 @@
 }
 
 .theme-option.active {
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  color: white;
+}
+
+.theme-dropdown-divider {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--border-color);
+}
+
+.theme-option--sound.is-on {
   background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
   color: white;
 }

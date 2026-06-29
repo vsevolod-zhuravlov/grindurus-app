@@ -21,6 +21,7 @@ import { ChainSelectorModal } from '../components/ChainSelectorModal'
 import { WalletIcon } from '../components/WalletIcon'
 import { playBullSound, primeBullSound } from '../utils/playBullSound'
 import { navigateTo } from '../utils/navigate'
+import { type GraiSection } from '../utils/graiNavigation'
 import { KNOWN_GRINDERS } from '../grai/grinders'
 import './GraiPage.css'
 
@@ -56,6 +57,13 @@ const BALANCE_COLUMN_ICONS = {
 } as const
 
 const GRINDERS_COLUMN_ICONS = {
+  lastAction: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  ),
   lastActionTime: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
@@ -88,6 +96,73 @@ const GRINDERS_COLUMN_ICONS = {
     </svg>
   ),
 } as const
+
+type GrinderDemoRow = {
+  name: string
+  lastActionLabel: string
+  lastAction: string
+  base: string
+  quote: string
+  quoteUsd: number
+  yieldBase: string
+  yieldQuote: string
+  yieldQuoteUsd: number
+}
+
+const GRINDER_DEMO_ROWS: GrinderDemoRow[] = [
+  {
+    name: 'grinder1',
+    lastActionLabel: 'Allocate',
+    lastAction: '2m ago',
+    base: '12 ETH',
+    quote: '18,240 USDC',
+    quoteUsd: 18_240,
+    yieldBase: '+0.82 ETH',
+    yieldQuote: '+2,140 USDC',
+    yieldQuoteUsd: 2_140,
+  },
+  {
+    name: 'grinder2',
+    lastActionLabel: 'Distribute',
+    lastAction: '7m ago',
+    base: '95 SOL',
+    quote: '9,870 USDT',
+    quoteUsd: 9_870,
+    yieldBase: '+10.6 SOL',
+    yieldQuote: '+1,180 USDT',
+    yieldQuoteUsd: 1_180,
+  },
+  {
+    name: 'grinder3',
+    lastActionLabel: 'Allocate',
+    lastAction: '19m ago',
+    base: '0.18 BTC',
+    quote: '14,220 USDC',
+    quoteUsd: 14_220,
+    yieldBase: '+0.009 BTC',
+    yieldQuote: '+620 USDC',
+    yieldQuoteUsd: 620,
+  },
+  {
+    name: 'grinder4',
+    lastActionLabel: 'Distribute',
+    lastAction: '31m ago',
+    base: '2,450 ARB',
+    quote: '3,410 USDC',
+    quoteUsd: 3_410,
+    yieldBase: '+380 ARB',
+    yieldQuote: '+540 USDC',
+    yieldQuoteUsd: 540,
+  },
+]
+
+const GRINDER_DEMO_TVL_USD = GRINDER_DEMO_ROWS.reduce((sum, row) => sum + row.quoteUsd, 0)
+const GRINDER_DEMO_YIELD_USD = GRINDER_DEMO_ROWS.reduce((sum, row) => sum + row.yieldQuoteUsd, 0)
+const GRINDER_DEMO_UPTIME_LABEL = '99.999%'
+
+function formatGrinderUsdTotal(value: number): string {
+  return `$${value.toLocaleString('en-US')}`
+}
 
 const BURN_TOTAL_SIGMA_ICON = (
   <span className="grai-burn-estimate-sigma" aria-hidden="true">
@@ -138,7 +213,7 @@ function navSharePct(assetNavUsdRaw: bigint, totalNavUsdRaw: bigint): number {
 function buildVaultCompositionRows(
   mintAssets: GraiAsset[],
   vaultBalances: Record<string, GraiAssetVaultBalances>,
-  valueKey: 'seniorUsdRaw' | 'juniorUsdRaw',
+  valueKey: 'seniorUsdRaw' | 'juniorUsdRaw' | 'allocatedUsdRaw',
 ) {
   if (mintAssets.length === 0) return []
 
@@ -157,6 +232,31 @@ function buildVaultCompositionRows(
 
   return rows.map((row) => ({
     ...row,
+    pct: navSharePct(row.valueUsdRaw, totalUsdRaw),
+    navUsdRaw: row.valueUsdRaw,
+  }))
+}
+
+function buildTotalAssetCompositionRows(
+  mintAssets: GraiAsset[],
+  vaultBalances: Record<string, GraiAssetVaultBalances>,
+) {
+  if (mintAssets.length === 0) return []
+
+  const rows = mintAssets.map((asset, index) => {
+    const vault = vaultBalances[asset.mint]
+    const valueUsdRaw = (vault?.seniorUsdRaw ?? 0n) + (vault?.juniorUsdRaw ?? 0n)
+    return {
+      asset,
+      color: ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length],
+      valueUsdRaw,
+    }
+  })
+  const totalUsdRaw = rows.reduce((sum, row) => sum + row.valueUsdRaw, 0n)
+
+  return rows.map((row) => ({
+    asset: row.asset,
+    color: row.color,
     pct: navSharePct(row.valueUsdRaw, totalUsdRaw),
     navUsdRaw: row.valueUsdRaw,
   }))
@@ -336,14 +436,45 @@ function GraiPage() {
   const [minterWalletCopied, setMinterWalletCopied] = useState(false)
   const [burnAmount, setBurnAmount] = useState('')
   const [isLegendTableHidden, setIsLegendTableHidden] = useState(false)
-  const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(false)
+  const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
   const [isMintSplitSharesHidden, setIsMintSplitSharesHidden] = useState(true)
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
+  const [hasTokenFlowMounted, setHasTokenFlowMounted] = useState(false)
   const mintAssetMenuRef = useRef<HTMLDivElement>(null)
   const toggleTokenFlow = useCallback(() => {
     setIsTokenFlowOpen((open) => !open)
+  }, [])
+  useEffect(() => {
+    if (isTokenFlowOpen) setHasTokenFlowMounted(true)
+  }, [isTokenFlowOpen])
+  useEffect(() => {
+    const applySection = (section: GraiSection) => {
+      if (section === 'mint') setActionView('mint')
+      else if (section === 'burn') setActionView('burn')
+      else if (section === 'grinders') setIsGrindersTableHidden(false)
+    }
+
+    const onSectionNav = (event: Event) => {
+      applySection((event as CustomEvent<GraiSection>).detail)
+    }
+
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      if (hash === 'mint' || hash === 'burn' || hash === 'grinders') {
+        applySection(hash)
+      }
+    }
+
+    window.addEventListener('grai-section-nav', onSectionNav)
+    window.addEventListener('hashchange', onHashChange)
+    onHashChange()
+
+    return () => {
+      window.removeEventListener('grai-section-nav', onSectionNav)
+      window.removeEventListener('hashchange', onHashChange)
+    }
   }, [])
   const bullSoundPlayedForRef = useRef<string | null>(null)
   const selectedAsset = useMemo(
@@ -395,8 +526,17 @@ function GraiPage() {
     () => buildVaultCompositionRows(mintAssets, vaultBalances, 'juniorUsdRaw'),
     [mintAssets, vaultBalances],
   )
+  const supplyCompositionRows = useMemo(
+    () => buildTotalAssetCompositionRows(mintAssets, vaultBalances),
+    [mintAssets, vaultBalances],
+  )
+  const allocatedCompositionRows = useMemo(
+    () => buildVaultCompositionRows(mintAssets, vaultBalances, 'allocatedUsdRaw'),
+    [mintAssets, vaultBalances],
+  )
   const totalNavUsdRaw = compositionRows.reduce((sum, row) => sum + row.navUsdRaw, 0n)
   const totalJuniorUsdRaw = juniorCompositionRows.reduce((sum, row) => sum + row.navUsdRaw, 0n)
+  const totalAllocatedUsdRaw = allocatedCompositionRows.reduce((sum, row) => sum + row.navUsdRaw, 0n)
   const totalNavLabel =
     vaultBalancesLoading || mintAssetsLoading
       ? '…'
@@ -405,6 +545,10 @@ function GraiPage() {
     vaultBalancesLoading || mintAssetsLoading
       ? '…'
       : formatVaultBalanceDisplay(totalJuniorUsdRaw, USD_SCALE, 2)
+  const totalAllocatedNavLabel =
+    vaultBalancesLoading || mintAssetsLoading
+      ? '…'
+      : formatVaultBalanceDisplay(totalAllocatedUsdRaw, USD_SCALE, 2)
   useEffect(() => {
     if (mintAssets.length === 0) return
     if (!mintAssets.some((asset) => asset.mint === selectedMint)) {
@@ -517,17 +661,18 @@ function GraiPage() {
           >
             <path d="M6 9l6 6 6-6" />
           </svg>
-          flow
+          FLOW
         </button>
       </div>
 
       <div
         id="grai-token-flow-panel"
-        className="grai-token-flow-panel"
-        hidden={!isTokenFlowOpen}
+        className={`grai-token-flow-panel${isTokenFlowOpen ? ' is-open' : ''}`}
         aria-hidden={!isTokenFlowOpen}
       >
-        {isTokenFlowOpen ? <GraiTokenFlowDiagram /> : null}
+        <div className="grai-token-flow-panel-inner">
+          {hasTokenFlowMounted ? <GraiTokenFlowDiagram /> : null}
+        </div>
       </div>
 
       <div className="grai-page-meta">
@@ -560,8 +705,154 @@ function GraiPage() {
           </a>
         </p>
       </div>
+
+      <div className="grai-bottom-row">
+        <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
+          <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
+            <span className="grai-grinders-summary-leading" style={{ gridColumn: '1 / span 2' }}>
+              <span className="grai-grinders-expand-control">
+                <button
+                  type="button"
+                  className={`grai-donut-legend-toggle grai-grinders-show-all-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
+                  onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
+                  aria-expanded={!isGrindersTableHidden}
+                  aria-controls="grai-grinders-table"
+                  aria-label={isGrindersTableHidden ? 'Show all grinders' : 'Hide grinders table'}
+                >
+                  <svg
+                    className="grai-donut-legend-toggle-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              </span>
+              <span role="columnheader" className="grai-grinders-group-general">
+                <span className="grai-grinder-active-dot" aria-hidden="true" />
+                {KNOWN_GRINDERS.length} grinders
+              </span>
+            </span>
+            <span role="columnheader" className="grai-grinders-group-title is-uptime" style={{ gridColumn: 3 }}>
+              <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                {GRINDERS_COLUMN_ICONS.lastActionTime}
+              </span>
+              UPTIME: {GRINDER_DEMO_UPTIME_LABEL}
+            </span>
+            <span role="columnheader" className="grai-grinders-group-title is-tvl is-stacked" style={{ gridColumn: '4 / span 2' }}>
+              <span className="grai-grinders-group-title-label">
+                <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                  {GRINDERS_COLUMN_ICONS.quote}
+                </span>
+                TVL:
+              </span>
+              <span className="grai-grinders-group-title-value">
+                {formatGrinderUsdTotal(GRINDER_DEMO_TVL_USD)}
+              </span>
+            </span>
+            <span role="columnheader" className="grai-grinders-group-title is-yield is-stacked" style={{ gridColumn: '6 / span 2' }}>
+              <span className="grai-grinders-group-title-label">
+                <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                  {GRINDERS_COLUMN_ICONS.yieldQuote}
+                </span>
+                Total Yield:
+              </span>
+              <span className="grai-grinders-group-title-value is-positive">
+                + {formatGrinderUsdTotal(GRINDER_DEMO_YIELD_USD)}
+              </span>
+            </span>
+          </div>
+        </div>
+        <section
+          className={`grai-bottom-card grai-bottom-card--table grai-grinders-table-panel${isGrindersTableHidden ? '' : ' is-open'}`}
+          aria-hidden={isGrindersTableHidden}
+          aria-label="Grinders in system"
+        >
+          <div className="grai-grinders-table-panel-inner">
+            <div
+              className="grai-grinders-table"
+              id="grai-grinders-table"
+              role="table"
+              aria-label="Grinders table"
+            >
+              <div className="grai-grinders-row grai-grinders-row--head" role="row">
+              <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
+                <a
+                  href="/grai/manage"
+                  className="grai-grinders-col-grinder-link"
+                  title="Grinder management"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    navigateTo('/grai/manage')
+                  }}
+                >
+                  <span className="grai-grinders-col-logos" aria-hidden="true">
+                    {KNOWN_GRINDERS.map((grinder) => (
+                      <img
+                        key={grinder.id}
+                        src="/logo.png"
+                        alt=""
+                        className="grai-grinders-col-logo"
+                      />
+                    ))}
+                  </span>
+                </a>
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-last-action-kind">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
+                Last action
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-last-action">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
+                Last action time
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-base">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.base}</span>
+                Base
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-quote">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.quote}</span>
+                Quote
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-yield-base">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldBase}</span>
+                Yield base
+              </span>
+              <span role="columnheader" className="grai-grinders-col-head is-yield-quote">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldQuote}</span>
+                Yield quote
+              </span>
+            </div>
+            {GRINDER_DEMO_ROWS.map((row) => (
+              <div className="grai-grinders-row" role="row" key={row.name}>
+                <span role="cell" className="grai-grinder-name">
+                  <span className="grai-grinder-active-dot" aria-hidden="true" />
+                  {row.name}
+                </span>
+                <span role="cell">{row.lastActionLabel}</span>
+                <span role="cell">{row.lastAction}</span>
+                <span role="cell">{row.base}</span>
+                <span role="cell">{row.quote}</span>
+                <span role="cell" className="is-positive">
+                  {row.yieldBase}
+                </span>
+                <span role="cell" className="is-positive">
+                  {row.yieldQuote}
+                </span>
+              </div>
+            ))}
+            </div>
+          </div>
+        </section>
+      </div>
+
       <FloatingTokenBackground tokens={STABLE_FLOATING_TOKENS} className="grai-content-row">
-        <div className="grai-actions-block">
+        <div className="grai-actions-block" id="grai-actions-section">
           <div className="grai-actions-row grai-actions-row-mint">
             <div className="grai-action-card grai-mint">
               <div className="grai-action-switch" role="tablist" aria-label="Mint or burn GRAI">
@@ -1086,15 +1377,18 @@ function GraiPage() {
           </div>
         </div>
       </FloatingTokenBackground>
-      <aside className="grai-assets-chart-card" aria-label="GRAI assets composition">
+      <aside className="grai-assets-chart-card" id="grai-assets-section" aria-label="GRAI assets composition">
           <div className="grai-assets-split">
             <div className="grai-assets-panel">
               <div className="grai-assets-overview">
               <div className="grai-donut-slot grai-donut-slot--supply" aria-label="GRAI total supply">
-                <span className="grai-assets-supply-label">Total Supply</span>
-                <span className="grai-assets-supply-value">
-                  {totalSupplyLoading ? '…' : `${totalSupplyLabel} GRAI`}
-                </span>
+                <GraiNavDonut
+                  slices={supplyCompositionRows}
+                  totalNavLabel={totalSupplyLoading ? '…' : totalSupplyLabel}
+                  centerLabel="Total Supply"
+                  valueUnit="GRAI"
+                  isLoading={totalSupplyLoading || vaultBalancesLoading || mintAssetsLoading}
+                />
               </div>
               <div className="grai-donut-slot grai-donut-slot--senior">
                 <GraiNavDonut
@@ -1109,6 +1403,14 @@ function GraiPage() {
                   slices={juniorCompositionRows}
                   totalNavLabel={totalJuniorNavLabel}
                   centerLabel="Junior Vault NAV"
+                  isLoading={vaultBalancesLoading || mintAssetsLoading}
+                />
+              </div>
+              <div className="grai-donut-slot grai-donut-slot--allocated" aria-label="Allocated NAV">
+                <GraiNavDonut
+                  slices={allocatedCompositionRows}
+                  totalNavLabel={totalAllocatedNavLabel}
+                  centerLabel="Allocated NAV"
                   isLoading={vaultBalancesLoading || mintAssetsLoading}
                 />
               </div>
@@ -1187,6 +1489,16 @@ function GraiPage() {
                             <img src={row.asset.icon.src} alt={row.asset.icon.alt} />
                           </span>
                           {row.asset.symbol}
+                          <a
+                            href={solscanTokenUrl(row.asset.mint)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="grai-mint-asset-value-solscan grai-asset-cell-solscan"
+                            aria-label={`View ${row.asset.symbol} on Solscan`}
+                            title={`View ${row.asset.symbol} on Solscan`}
+                          >
+                            {MINT_ASSET_SOLSCAN_ICON}
+                          </a>
                         </span>
                       </div>
                       <div className="grai-balance-table-cell grai-balance-table-value">
@@ -1208,161 +1520,6 @@ function GraiPage() {
             </div>
           </div>
         </aside>
-      <div className="grai-bottom-row">
-        <section className="grai-bottom-card grai-bottom-card--table" aria-label="Grinders in system">
-          <div
-            className={`grai-grinders-table ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
-            id="grai-grinders-table"
-            role="table"
-            aria-label="Grinders table"
-          >
-            <div className="grai-grinders-row grai-grinders-row--group" role="row">
-              <span
-                role="columnheader"
-                className="grai-grinders-group-general"
-                style={{ gridColumn: '1 / span 2' }}
-              >
-                <button
-                  type="button"
-                  className={`grai-donut-legend-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
-                  onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
-                  aria-expanded={!isGrindersTableHidden}
-                  aria-controls="grai-grinders-table"
-                  aria-label={isGrindersTableHidden ? 'Show grinders table' : 'Hide grinders table'}
-                >
-                  <svg
-                    className="grai-donut-legend-toggle-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </button>
-                Grinders
-              </span>
-              <span role="columnheader" className="grai-grinders-group-title" style={{ gridColumn: '3 / span 2' }}>
-                📦 Balances
-              </span>
-              <span role="columnheader" className="grai-grinders-group-title" style={{ gridColumn: '5 / span 2' }}>
-                📈 Yield
-              </span>
-            </div>
-            {!isGrindersTableHidden && (
-              <>
-            <div className="grai-grinders-row grai-grinders-row--head" role="row">
-              <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
-                <a
-                  href="/grai/manage"
-                  className="grai-grinders-col-grinder-link"
-                  title="Grinder management"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    navigateTo('/grai/manage')
-                  }}
-                >
-                  <span className="grai-grinders-col-logos" aria-hidden="true">
-                    {KNOWN_GRINDERS.map((grinder) => (
-                      <img
-                        key={grinder.id}
-                        src="/logo.png"
-                        alt=""
-                        className="grai-grinders-col-logo"
-                      />
-                    ))}
-                  </span>
-                </a>
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-last-action">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
-                Last action time
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-base">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.base}</span>
-                Base
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-quote">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.quote}</span>
-                Quote
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-yield-base">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldBase}</span>
-                Yield base
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-yield-quote">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldQuote}</span>
-                Yield quote
-              </span>
-            </div>
-            <div className="grai-grinders-row" role="row">
-              <span role="cell" className="grai-grinder-name">
-                <span className="grai-grinder-active-dot" aria-hidden="true" />
-                grinder1
-              </span>
-              <span role="cell">2m ago</span>
-              <span role="cell">12 ETH</span>
-              <span role="cell">18,240 USDC</span>
-              <span role="cell" className="is-positive">
-                +0.82 ETH
-              </span>
-              <span role="cell" className="is-positive">
-                +2,140 USDC
-              </span>
-            </div>
-            <div className="grai-grinders-row" role="row">
-              <span role="cell" className="grai-grinder-name">
-                <span className="grai-grinder-active-dot" aria-hidden="true" />
-                grinder2
-              </span>
-              <span role="cell">7m ago</span>
-              <span role="cell">95 SOL</span>
-              <span role="cell">9,870 USDT</span>
-              <span role="cell" className="is-positive">
-                +10.6 SOL
-              </span>
-              <span role="cell" className="is-positive">
-                +1,180 USDT
-              </span>
-            </div>
-            <div className="grai-grinders-row" role="row">
-              <span role="cell" className="grai-grinder-name">
-                <span className="grai-grinder-active-dot" aria-hidden="true" />
-                grinder3
-              </span>
-              <span role="cell">19m ago</span>
-              <span role="cell">0.18 BTC</span>
-              <span role="cell">14,220 USDC</span>
-              <span role="cell" className="is-positive">
-                +0.009 BTC
-              </span>
-              <span role="cell" className="is-positive">
-                +620 USDC
-              </span>
-            </div>
-            <div className="grai-grinders-row" role="row">
-              <span role="cell" className="grai-grinder-name">
-                <span className="grai-grinder-active-dot" aria-hidden="true" />
-                grinder4
-              </span>
-              <span role="cell">31m ago</span>
-              <span role="cell">2,450 ARB</span>
-              <span role="cell">3,410 USDC</span>
-              <span role="cell" className="is-positive">
-                +380 ARB
-              </span>
-              <span role="cell" className="is-positive">
-                +540 USDC
-              </span>
-            </div>
-              </>
-            )}
-          </div>
-        </section>
-      </div>
       <ChainSelectorModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}

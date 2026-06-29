@@ -8,6 +8,8 @@ import { Buffer } from 'buffer'
 import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { ChainSelectorModal } from '../components/ChainSelectorModal'
+import { InventoryHistoryChart, type InventoryHistoryPoint } from '../components/InventoryHistoryChart'
+import { YieldChart, type YieldHistoryPoint } from '../components/YieldChart'
 import './BacktestPage.css'
 
 const DEFAULT_BASE_ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'MATIC'] as const
@@ -375,19 +377,38 @@ function formatBacktestApiError(data: unknown, status: number): string {
   return `Request failed (${status})`
 }
 
-function buildSeriesPath(values: number[]) {
-  if (values.length === 0) return ''
-  if (values.length === 1) return `M 0 50`
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = Math.max(1e-9, max - min)
-  return values
-    .map((v, idx) => {
-      const x = (idx / (values.length - 1)) * 100
-      const y = 100 - ((v - min) / range) * 100
-      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
-    })
-    .join(' ')
+function buildBacktestChartHistory(
+  dateFrom: string,
+  dateTo: string,
+  rangeDays: number,
+  baseAmount: string,
+  quoteAmount: string
+): { inventoryHistory: InventoryHistoryPoint[]; yieldHistory: YieldHistoryPoint[] } {
+  const days = Math.max(8, Math.min(32, rangeDays))
+  const fromMs = new Date(`${dateFrom}T00:00:00`).getTime()
+  const toMs = new Date(`${dateTo}T00:00:00`).getTime()
+  const stepMs = days > 1 ? (toMs - fromMs) / (days - 1) : 0
+  const baseSeed = Number(baseAmount.replace(/,/g, '')) || 1
+  const quoteSeed = Number(quoteAmount.replace(/,/g, '')) || 1
+  const spotSeed = Math.max(1, quoteSeed / Math.max(baseSeed, 1e-9))
+
+  const inventoryHistory: InventoryHistoryPoint[] = []
+  const yieldHistory: YieldHistoryPoint[] = []
+
+  for (let i = 0; i < days; i++) {
+    const t = fromMs + stepMs * i
+    const base = baseSeed * (0.9 + i * 0.004) + Math.sin(i / 2.1) * baseSeed * 0.03
+    const quote = quoteSeed * (0.92 + i * 0.0036) + Math.cos(i / 2.6) * quoteSeed * 0.02
+    const spot = spotSeed * (0.98 + i * 0.0012) + Math.sin(i / 3.4) * spotSeed * 0.015
+    const pnlQuote = (i / Math.max(1, days - 1)) * 7.5 + Math.sin(i / 3) * 1.2
+    const pnlBase = ((i / Math.max(1, days - 1)) * 5.4 + Math.cos(i / 2.3) * 0.9) / Math.max(spot, 1e-9)
+    const totalPnl = pnlQuote + pnlBase * spot
+
+    inventoryHistory.push({ t, base, quote, spot })
+    yieldHistory.push({ t, pnlQuote, pnlBase, price: spot, totalPnl })
+  }
+
+  return { inventoryHistory, yieldHistory }
 }
 
 function BacktestPage() {
@@ -1053,37 +1074,23 @@ function BacktestPage() {
     () => daysInclusive(featuredBacktest.dateFrom, featuredBacktest.dateTo),
     [featuredBacktest.dateFrom, featuredBacktest.dateTo]
   )
-  const backtestChartSeries = useMemo(() => {
-    const days = Math.max(8, Math.min(32, featuredRangeDays))
-    const baseSeed = Number(featuredBacktest.baseAmount.replace(/,/g, '')) || 1
-    const quoteSeed = Number(featuredBacktest.quoteAmount.replace(/,/g, '')) || 1
-    const invBase = Array.from({ length: days }, (_, i) => {
-      const trend = baseSeed * (0.9 + i * 0.004)
-      const wave = Math.sin(i / 2.1) * baseSeed * 0.03
-      return trend + wave
-    })
-    const invQuote = Array.from({ length: days }, (_, i) => {
-      const trend = quoteSeed * (0.92 + i * 0.0036)
-      const wave = Math.cos(i / 2.6) * quoteSeed * 0.02
-      return trend + wave
-    })
-    const pnlQuote = Array.from({ length: days }, (_, i) => {
-      const slope = (i / Math.max(1, days - 1)) * 7.5
-      return slope + Math.sin(i / 3) * 1.2
-    })
-    const pnlBasePx = Array.from({ length: days }, (_, i) => {
-      const slope = (i / Math.max(1, days - 1)) * 5.4
-      return slope + Math.cos(i / 2.3) * 0.9
-    })
-    const pnlTotal = pnlQuote.map((v, i) => v + pnlBasePx[i] * 0.85)
-    return {
-      inventoryBasePath: buildSeriesPath(invBase),
-      inventoryQuotePath: buildSeriesPath(invQuote),
-      yieldQuotePath: buildSeriesPath(pnlQuote),
-      yieldBasePath: buildSeriesPath(pnlBasePx),
-      yieldTotalPath: buildSeriesPath(pnlTotal),
-    }
-  }, [featuredBacktest.baseAmount, featuredBacktest.quoteAmount, featuredRangeDays])
+  const backtestChartHistory = useMemo(
+    () =>
+      buildBacktestChartHistory(
+        featuredBacktest.dateFrom,
+        featuredBacktest.dateTo,
+        featuredRangeDays,
+        featuredBacktest.baseAmount,
+        featuredBacktest.quoteAmount
+      ),
+    [
+      featuredBacktest.baseAmount,
+      featuredBacktest.dateFrom,
+      featuredBacktest.dateTo,
+      featuredBacktest.quoteAmount,
+      featuredRangeDays,
+    ]
+  )
 
   return (
     <div className="backtest-page">
@@ -1568,7 +1575,7 @@ function BacktestPage() {
           <div
             className="backtest-queue-wrap"
             role="region"
-            aria-label={queueView === 'queue' ? 'Backtests Queue' : 'Backtests Stack'}
+            aria-label={queueView === 'queue' ? 'Queue' : 'Stack'}
           >
             <div className="backtest-queue-head">
               <div className="backtest-queue-view-switch" role="tablist" aria-label="Queue data view">
@@ -1579,7 +1586,7 @@ function BacktestPage() {
                   className={`backtest-queue-view-btn is-queue ${queueView === 'queue' ? 'is-active' : ''}`}
                   onClick={() => setQueueView('queue')}
                 >
-                  Backtest Queue
+                  Queue
                 </button>
                 <button
                   type="button"
@@ -1588,7 +1595,7 @@ function BacktestPage() {
                   className={`backtest-queue-view-btn is-stack ${queueView === 'history' ? 'is-active' : ''}`}
                   onClick={() => setQueueView('history')}
                 >
-                  Backtest Stack
+                  Stack
                 </button>
               </div>
               <div
@@ -1881,21 +1888,58 @@ function BacktestPage() {
             ({featuredRangeDays} days).
           </p>
           <div className="grinder-adapter-tab-main-grid" aria-label="Backtest charts">
-            <article className="backtest-chart-panel">
-              <div className="backtest-chart-panel-head">Inventory</div>
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="backtest-mini-chart">
-                <path d={backtestChartSeries.inventoryQuotePath} className="line quote" />
-                <path d={backtestChartSeries.inventoryBasePath} className="line base" />
-              </svg>
-            </article>
-            <article className="backtest-chart-panel">
-              <div className="backtest-chart-panel-head">Yield</div>
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="backtest-mini-chart">
-                <path d={backtestChartSeries.yieldQuotePath} className="line quote" />
-                <path d={backtestChartSeries.yieldBasePath} className="line basepx" />
-                <path d={backtestChartSeries.yieldTotalPath} className="line total" />
-              </svg>
-            </article>
+            <div className="adapter-tab-content adapter-tab-content--inventory grinder-adapter-tab-main__inventory backtest-chart-panel">
+              <div className="grinder-adapter-tab-main-panel-head">
+                <span className="grinder-adapter-tab-main-panel-head-icon" aria-hidden>
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="3" width="7" height="7" rx="1" fill="none" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" fill="none" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" fill="none" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" fill="none" />
+                  </svg>
+                </span>
+                <span className="grinder-adapter-tab-main-panel-head-title">Inventory</span>
+              </div>
+              <InventoryHistoryChart
+                history={backtestChartHistory.inventoryHistory}
+                baseAsset={featuredBacktest.base}
+                quoteAsset={featuredBacktest.quote}
+              />
+            </div>
+            <div className="adapter-tab-content grinder-adapter-tab-main__yield backtest-chart-panel">
+              <div className="grinder-adapter-tab-main-panel-head">
+                <span className="grinder-adapter-tab-main-panel-head-icon" aria-hidden>
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 3v18h18" />
+                    <path d="M7 16l4-4 4 4 6-7" />
+                  </svg>
+                </span>
+                <span className="grinder-adapter-tab-main-panel-head-title">Yield</span>
+              </div>
+              <YieldChart
+                history={backtestChartHistory.yieldHistory}
+                baseAsset={featuredBacktest.base}
+                quoteAsset={featuredBacktest.quote}
+              />
+            </div>
           </div>
         </section>
       </div>

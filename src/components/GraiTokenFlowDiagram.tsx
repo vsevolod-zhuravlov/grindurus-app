@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
   BaseEdge,
@@ -336,6 +336,7 @@ function FlowCanvas({
 }: FlowCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef(0)
+  const [isReady, setIsReady] = useState(false)
   const flowNodes = useMemo(() => nodes, [nodes])
   const flowEdges = useMemo(() => edges, [edges])
 
@@ -343,6 +344,7 @@ function FlowCanvas({
 
   const onInit = useCallback((instance: ReactFlowInstance<Node<GraiFlowNodeData>, Edge>) => {
     cancelAnimationFrame(rafRef.current)
+    setIsReady(false)
     const zoom = FLOW_FIXED_ZOOM
     const center = () => {
       if (centerInPane && containerRef.current) {
@@ -357,12 +359,19 @@ function FlowCanvas({
       })
     }
     rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = requestAnimationFrame(center)
+      rafRef.current = requestAnimationFrame(() => {
+        center()
+        setIsReady(true)
+      })
     })
   }, [fitPadding, centerInPane])
 
   return (
-    <div ref={containerRef} className="grai-token-flow-canvas" style={{ height }}>
+    <div
+      ref={containerRef}
+      className={`grai-token-flow-canvas${isReady ? ' is-ready' : ''}`}
+      style={{ height }}
+    >
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}

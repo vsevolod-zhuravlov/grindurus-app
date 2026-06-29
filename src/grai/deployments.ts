@@ -1,15 +1,25 @@
 import { clusterApiUrl, Connection, PublicKey } from '@solana/web3.js'
 import type { SolanaCluster } from '../providers/AppWalletProvider'
+import { fetchGraiProtocol } from './fetchGraiProtocol'
 
 export type GraiChainKind = 'solana' | 'evm'
 
 export type GraiSolanaConfig = {
   kind: 'solana'
   cluster: SolanaCluster
-  programId: PublicKey
   graiMint: PublicKey
   rpcUrl: string
 }
+
+/** On-chain resolved GRAI deployment (program id discovered from mint). */
+export type GraiSolanaRuntime = GraiSolanaConfig & {
+  programId: PublicKey
+  graiState: PublicKey
+}
+
+const DEVNET_DEFAULTS = {
+  graiMint: '5UjazXW1NqBD1HnW9WfEdjHZUJsjk4prvuabq8GfEn5Q',
+} as const
 
 export type GraiEvmConfig = {
   kind: 'evm'
@@ -18,11 +28,6 @@ export type GraiEvmConfig = {
   graiToken: `0x${string}` | null
   protocolAddress: `0x${string}` | null
 }
-
-const DEVNET_DEFAULTS = {
-  programId: 'APwEPN6PYrRgEqL2G2CnmhQNouikdKiNdPJ48YX5Y8a8',
-  graiMint: '5UjazXW1NqBD1HnW9WfEdjHZUJsjk4prvuabq8GfEn5Q',
-} as const
 
 const EVM_CHAINS = [
   { chainId: 1, chainName: 'Ethereum', envSuffix: 'ETHEREUM' },
@@ -84,36 +89,26 @@ export function resolveSolanaRpcUrl(cluster: SolanaCluster): string {
   return resolveSolanaRpcUrlInternal(cluster)
 }
 
-function resolveSolanaAddresses(cluster: SolanaCluster): { programId?: string; graiMint?: string } {
-  const specificProgramId = readEnv(`VITE_GRAI_${clusterEnvSuffix(cluster)}_PROGRAM_ID`)
+function resolveGraiMintAddress(cluster: SolanaCluster): string | undefined {
   const specificMint = readEnv(`VITE_GRAI_${clusterEnvSuffix(cluster)}_MINT`)
-
   const isDefaultCluster = cluster === getDefaultGraiSolanaCluster()
-  const legacyProgramId = isDefaultCluster ? readEnv('VITE_GRAI_PROGRAM_ID') : undefined
   const legacyMint = isDefaultCluster ? readEnv('VITE_GRAI_MINT') : undefined
 
   if (cluster === 'devnet') {
-    return {
-      programId: specificProgramId ?? legacyProgramId ?? DEVNET_DEFAULTS.programId,
-      graiMint: specificMint ?? legacyMint ?? DEVNET_DEFAULTS.graiMint,
-    }
+    return specificMint ?? legacyMint ?? DEVNET_DEFAULTS.graiMint
   }
 
-  return {
-    programId: specificProgramId ?? legacyProgramId,
-    graiMint: specificMint ?? legacyMint,
-  }
+  return specificMint ?? legacyMint
 }
 
 export function resolveGraiSolanaConfig(cluster: SolanaCluster): GraiSolanaConfig | null {
-  const { programId, graiMint } = resolveSolanaAddresses(cluster)
-  if (!programId || !graiMint) return null
+  const graiMint = resolveGraiMintAddress(cluster)
+  if (!graiMint) return null
 
   try {
     return {
       kind: 'solana',
       cluster,
-      programId: new PublicKey(programId),
       graiMint: new PublicKey(graiMint),
       rpcUrl: resolveSolanaRpcUrlInternal(cluster),
     }
@@ -132,6 +127,18 @@ export function getGraiSolanaConfigOrThrow(cluster = getDefaultGraiSolanaCluster
 
 export function createGraiConnection(config: GraiSolanaConfig): Connection {
   return new Connection(config.rpcUrl, 'confirmed')
+}
+
+export async function resolveGraiSolanaRuntime(
+  connection: Connection,
+  config: GraiSolanaConfig,
+): Promise<GraiSolanaRuntime> {
+  const protocol = await fetchGraiProtocol(connection, config.graiMint)
+  return {
+    ...config,
+    programId: protocol.programId,
+    graiState: protocol.graiState,
+  }
 }
 
 export function graiStatePda(programId: PublicKey): PublicKey {

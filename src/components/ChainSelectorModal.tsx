@@ -150,99 +150,115 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
         </div>
 
         <div className="wallet-modal-content">
-          {activeTab === 'evm' && (
-            <div className="wallet-options">
-              {evmWallet.connectors.length > 0 ? (
-                evmWallet.connectors.map((connector) => (
-                  <button
-                    key={connector.uid} 
-                    className="wallet-option-btn"
-                    onClick={() => {
-                      void handleEvmConnectorSelect(connector.uid)
-                    }}
-                  >
-                    <img 
-                      src={getConnectorIcon(connector)} 
-                      alt={connector.name} 
-                      className="wallet-icon"
-                    />
-                    <div className="wallet-option-info">
-                      <span className="wallet-option-name">{connector.name}</span>
-                      <span className="wallet-option-desc wallet-detected">Detected</span>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="no-wallets-message">
-                  <p>No EVM wallets detected</p>
-                  <p className="no-wallets-hint">
-                    Install MetaMask or use WalletConnect (Rainbow) to continue
-                  </p>
-                  <button
-                    type="button"
-                    className="wallet-option-btn wallet-option-btn--walletconnect"
-                    onClick={handleWalletConnectFallback}
-                  >
-                    <img
-                      src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4"
-                      alt="WalletConnect"
-                      className="wallet-icon"
-                    />
-                    <div className="wallet-option-info">
-                      <span className="wallet-option-name">WalletConnect (Rainbow)</span>
-                      <span className="wallet-option-desc wallet-detected">Open QR modal</span>
-                    </div>
-                  </button>
-                </div>
-              )}
-              {evmConnectError && <p className="wallet-evm-error">{evmConnectError}</p>}
-            </div>
-          )}
-          {activeTab === 'solana' && (
-            <div className="wallet-options">
-              {solanaWallet.detectedWallets.length > 0 ? (
-                solanaWallet.detectedWallets.map((w) => (
-                  <button 
-                    key={w.adapter.name} 
-                    className="wallet-option-btn"
-                    onClick={() => handleSolanaWalletSelect(w.adapter.name)}
-                  >
-                    <span className={`wallet-icon-wrap ${isSolanaMetamask(w.adapter.name) ? 'has-solana-badge' : ''}`}>
-                      <img 
-                        src={w.adapter.icon} 
-                        alt={w.adapter.name} 
+          <div className="wallet-modal-panels">
+            <div
+              className={`wallet-modal-panel${activeTab === 'evm' ? ' is-active' : ''}`}
+              role="tabpanel"
+              aria-hidden={activeTab !== 'evm'}
+            >
+              <div className="wallet-options">
+                {evmWallet.connectors.length > 0 ? (
+                  evmWallet.connectors.map((connector) => (
+                    <button
+                      key={connector.uid}
+                      className="wallet-option-btn"
+                      onClick={() => {
+                        void handleEvmConnectorSelect(connector.uid)
+                      }}
+                    >
+                      <img
+                        src={getConnectorIcon(connector)}
+                        alt={connector.name}
                         className="wallet-icon"
                       />
-                      {isSolanaMetamask(w.adapter.name) && (
-                        <img
-                          src="https://upload.wikimedia.org/wikipedia/en/b/b9/Solana_logo.png"
-                          alt="Solana"
-                          className="wallet-icon-badge wallet-icon-badge--solana"
-                        />
-                      )}
-                    </span>
-                    <div className="wallet-option-info">
-                      <span className="wallet-option-name">{w.adapter.name}</span>
-                      <span className="wallet-option-desc wallet-detected">Detected</span>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="no-wallets-message">
-                  <p>No Solana wallets detected</p>
-                  <p className="no-wallets-hint">Install Phantom, Solflare, or Coinbase Wallet to continue</p>
-                </div>
-              )}
-            </div>
-          )}
-          {activeTab === 'movevm' && (
-            <div className="wallet-options">
-              <div className="no-wallets-message">
-                <p>MoveVM wallets coming soon</p>
-                <p className="no-wallets-hint">Support for Aptos and Sui wallets is in development</p>
+                      <div className="wallet-option-info">
+                        <span className="wallet-option-name">{connector.name}</span>
+                        <span className="wallet-option-desc wallet-detected">Detected</span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="no-wallets-message">
+                    <p>No EVM wallets detected</p>
+                    <p className="no-wallets-hint">
+                      Install MetaMask or use WalletConnect (Rainbow) to continue
+                    </p>
+                    <button
+                      type="button"
+                      className="wallet-option-btn wallet-option-btn--walletconnect"
+                      onClick={handleWalletConnectFallback}
+                    >
+                      <img
+                        src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4"
+                        alt="WalletConnect"
+                        className="wallet-icon"
+                      />
+                      <div className="wallet-option-info">
+                        <span className="wallet-option-name">WalletConnect (Rainbow)</span>
+                        <span className="wallet-option-desc wallet-detected">Open QR modal</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+                {evmConnectError && <p className="wallet-evm-error">{evmConnectError}</p>}
               </div>
             </div>
-          )}
+
+            <div
+              className={`wallet-modal-panel${activeTab === 'solana' ? ' is-active' : ''}`}
+              role="tabpanel"
+              aria-hidden={activeTab !== 'solana'}
+            >
+              <div className="wallet-options">
+                {solanaWallet.detectedWallets.length > 0 ? (
+                  solanaWallet.detectedWallets.map((w) => (
+                    <button
+                      key={w.adapter.name}
+                      className="wallet-option-btn"
+                      onClick={() => handleSolanaWalletSelect(w.adapter.name)}
+                    >
+                      <span className={`wallet-icon-wrap ${isSolanaMetamask(w.adapter.name) ? 'has-solana-badge' : ''}`}>
+                        <img
+                          src={w.adapter.icon}
+                          alt={w.adapter.name}
+                          className="wallet-icon"
+                        />
+                        {isSolanaMetamask(w.adapter.name) && (
+                          <img
+                            src="https://upload.wikimedia.org/wikipedia/en/b/b9/Solana_logo.png"
+                            alt="Solana"
+                            className="wallet-icon-badge wallet-icon-badge--solana"
+                          />
+                        )}
+                      </span>
+                      <div className="wallet-option-info">
+                        <span className="wallet-option-name">{w.adapter.name}</span>
+                        <span className="wallet-option-desc wallet-detected">Detected</span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="no-wallets-message">
+                    <p>No Solana wallets detected</p>
+                    <p className="no-wallets-hint">Install Phantom, Solflare, or Coinbase Wallet to continue</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={`wallet-modal-panel${activeTab === 'movevm' ? ' is-active' : ''}`}
+              role="tabpanel"
+              aria-hidden={activeTab !== 'movevm'}
+            >
+              <div className="wallet-options">
+                <div className="no-wallets-message">
+                  <p>MoveVM wallets coming soon</p>
+                  <p className="no-wallets-hint">Support for Aptos and Sui wallets is in development</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>,

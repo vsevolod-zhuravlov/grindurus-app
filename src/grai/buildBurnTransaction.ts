@@ -4,7 +4,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js'
-import type { GraiSolanaConfig } from './deployments'
+import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { fetchGraiRegistryAssetMints } from './fetchAssets'
 import { fetchMintDecimals, parseTokenAmount } from './onchain'
@@ -24,7 +24,7 @@ export type BuildBurnTransactionParams = {
   burner: PublicKey
   graiAmount: bigint
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function buildBurnTransaction({
@@ -101,7 +101,7 @@ export type ExecuteBurnParams = {
   amountInput: string
   signTransaction: (transaction: Transaction) => Promise<Transaction>
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function executeBurn({

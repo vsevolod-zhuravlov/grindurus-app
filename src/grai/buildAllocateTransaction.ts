@@ -5,7 +5,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js'
-import type { GraiSolanaConfig } from './deployments'
+import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { fetchMintDecimals, parseTokenAmount } from './onchain'
 import {
@@ -32,7 +32,7 @@ export type BuildAllocateTransactionParams = {
   custodyWallet: PublicKey
   amount: bigint
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function buildAllocateTransaction({
@@ -90,7 +90,7 @@ export type ExecuteAllocateParams = {
   amountInput: string
   signTransaction: (transaction: Transaction) => Promise<Transaction>
   connection: Connection
-  config: GraiSolanaConfig
+  config: GraiSolanaRuntime
 }
 
 export async function executeAllocate({
