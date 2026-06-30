@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import GraiPage from './pages/GraiPage'
-import GraiManagePage from './pages/GraiManagePage'
 import BacktestPage from './pages/BacktestPage'
 import Header, { type HeaderMainView } from './components/Header'
 import { isAtAppPath, stripBasePath, toAppPath } from './utils/appPaths'
+import { navigateToGraiSection } from './utils/graiNavigation'
 import './App.css'
 
 type AppRoute = 'grai' | 'grai-manage' | 'backtest'
@@ -50,16 +50,22 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (route === 'grai-manage') {
+      window.history.replaceState({}, '', `${toAppPath('/grai')}#manage`)
+      setRoute('grai')
+      navigateToGraiSection('manage')
+    }
+  }, [route])
+
+  useEffect(() => {
     document.title = titleFromRoute(route)
   }, [route])
 
   return (
     <div className="App">
-      <Header activeView={mainView} onViewChange={handleViewChange} isGraiManage={route === 'grai-manage'} />
+      <Header activeView={mainView} onViewChange={handleViewChange} />
       <main className={`App-main ${route === 'backtest' ? 'App-main--backtest' : ''}`}>
-        {route === 'grai-manage' ? (
-          <GraiManagePage />
-        ) : route === 'grai' ? (
+        {route === 'grai' || route === 'grai-manage' ? (
           <GraiPage />
         ) : (
           <BacktestPage />

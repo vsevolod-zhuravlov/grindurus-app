@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { ConnectWalletButton } from './ConnectWalletButton'
-import { navigateTo } from '../utils/navigate'
 import { assetUrl } from '../utils/appPaths'
 import {
   navigateToGraiSection,
@@ -17,7 +16,6 @@ export type HeaderMainView = 'grai' | 'backtest'
 interface HeaderProps {
   activeView: HeaderMainView
   onViewChange: (view: HeaderMainView) => void
-  isGraiManage?: boolean
 }
 
 const GRAI_MENU_CHEVRON = (
@@ -82,7 +80,7 @@ const GRAI_MANAGE_MENU_ICON = (
   </svg>
 )
 
-function Header({ activeView, onViewChange, isGraiManage = false }: HeaderProps) {
+function Header({ activeView, onViewChange }: HeaderProps) {
   const [graiMenuOpen, setGraiMenuOpen] = useState(false)
   const [graiSection, setGraiSection] = useState<GraiSection | null>(() => readGraiSectionFromHash())
   const graiMenuRef = useRef<HTMLDivElement>(null)
@@ -115,11 +113,11 @@ function Header({ activeView, onViewChange, isGraiManage = false }: HeaderProps)
   }
 
   const handleManageClick = () => {
-    navigateTo('/grai/manage')
+    navigateToGraiSection('manage', () => onViewChange('grai'))
     setGraiMenuOpen(false)
   }
 
-  const isGraiPage = activeView === 'grai' && !isGraiManage
+  const isGraiPage = activeView === 'grai'
 
   return (
     <header className="header">
@@ -213,7 +211,7 @@ function Header({ activeView, onViewChange, isGraiManage = false }: HeaderProps)
                   <button
                     type="button"
                     role="menuitem"
-                    className={`header-nav-grai-dropdown-item ${isGraiManage ? 'is-active' : ''}`}
+                    className={`header-nav-grai-dropdown-item ${isGraiPage && graiSection === 'manage' ? 'is-active' : ''}`}
                     onClick={handleManageClick}
                   >
                     <span className="header-nav-grai-dropdown-item-icon" aria-hidden="true">

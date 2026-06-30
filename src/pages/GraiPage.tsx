@@ -22,8 +22,10 @@ import { WalletIcon } from '../components/WalletIcon'
 import { playBullSound, primeBullSound } from '../utils/playBullSound'
 import { navigateTo } from '../utils/navigate'
 import { assetUrl, toAppPath } from '../utils/appPaths'
-import { type GraiSection } from '../utils/graiNavigation'
+import { type GraiSection, navigateToGraiSection } from '../utils/graiNavigation'
 import { KNOWN_GRINDERS } from '../grai/grinders'
+import { GraiManageSection } from './GraiManagePage'
+import './GraiManagePage.css'
 import './GraiPage.css'
 
 const BALANCE_COLUMN_ICONS = {
@@ -463,7 +465,7 @@ function GraiPage() {
 
     const onHashChange = () => {
       const hash = window.location.hash.slice(1)
-      if (hash === 'mint' || hash === 'burn' || hash === 'grinders') {
+      if (hash === 'mint' || hash === 'burn' || hash === 'grinders' || hash === 'manage') {
         applySection(hash)
       }
     }
@@ -711,39 +713,19 @@ function GraiPage() {
         <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
           <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
             <span className="grai-grinders-summary-leading" style={{ gridColumn: '1 / span 2' }}>
-              <span className="grai-grinders-expand-control">
-                <button
-                  type="button"
-                  className={`grai-donut-legend-toggle grai-grinders-show-all-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
-                  onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
-                  aria-expanded={!isGrindersTableHidden}
-                  aria-controls="grai-grinders-table"
-                  aria-label={isGrindersTableHidden ? 'Show all grinders' : 'Hide grinders table'}
-                >
-                  <svg
-                    className="grai-donut-legend-toggle-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </button>
-              </span>
               <span role="columnheader" className="grai-grinders-group-general">
                 <span className="grai-grinder-active-dot" aria-hidden="true" />
                 {KNOWN_GRINDERS.length} grinders
               </span>
             </span>
-            <span role="columnheader" className="grai-grinders-group-title is-uptime" style={{ gridColumn: 3 }}>
-              <span className="grai-grinders-group-title-icon" aria-hidden="true">
-                {GRINDERS_COLUMN_ICONS.lastActionTime}
+            <span role="columnheader" className="grai-grinders-group-title is-uptime is-stacked" style={{ gridColumn: 3 }}>
+              <span className="grai-grinders-group-title-label">
+                <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                  {GRINDERS_COLUMN_ICONS.lastActionTime}
+                </span>
+                UPTIME:
               </span>
-              UPTIME: {GRINDER_DEMO_UPTIME_LABEL}
+              <span className="grai-grinders-group-title-value">{GRINDER_DEMO_UPTIME_LABEL}</span>
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-tvl is-stacked" style={{ gridColumn: '4 / span 2' }}>
               <span className="grai-grinders-group-title-label">
@@ -768,12 +750,11 @@ function GraiPage() {
               </span>
             </span>
           </div>
-        </div>
-        <section
-          className={`grai-bottom-card grai-bottom-card--table grai-grinders-table-panel${isGrindersTableHidden ? '' : ' is-open'}`}
-          aria-hidden={isGrindersTableHidden}
-          aria-label="Grinders in system"
-        >
+          <section
+            className={`grai-bottom-card grai-bottom-card--table grai-grinders-table-panel${isGrindersTableHidden ? '' : ' is-open'}`}
+            aria-hidden={isGrindersTableHidden}
+            aria-label="Grinders in system"
+          >
           <div className="grai-grinders-table-panel-inner">
             <div
               className="grai-grinders-table"
@@ -784,12 +765,12 @@ function GraiPage() {
               <div className="grai-grinders-row grai-grinders-row--head" role="row">
               <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
                 <a
-                  href={toAppPath('/grai/manage')}
+                  href={`${toAppPath('/grai')}#manage`}
                   className="grai-grinders-col-grinder-link"
                   title="Grinder management"
                   onClick={(event) => {
                     event.preventDefault()
-                    navigateTo('/grai/manage')
+                    navigateToGraiSection('manage')
                   }}
                 >
                   <span className="grai-grinders-col-logos" aria-hidden="true">
@@ -850,6 +831,30 @@ function GraiPage() {
             </div>
           </div>
         </section>
+          <div className="grai-grinders-summary-toggle">
+            <button
+              type="button"
+              className={`grai-donut-legend-toggle grai-grinders-show-all-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
+              onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
+              aria-expanded={!isGrindersTableHidden}
+              aria-controls="grai-grinders-table"
+              aria-label={isGrindersTableHidden ? 'Show all grinders' : 'Hide grinders table'}
+            >
+              <svg
+                className="grai-donut-legend-toggle-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <FloatingTokenBackground tokens={STABLE_FLOATING_TOKENS} className="grai-content-row">
@@ -1380,71 +1385,48 @@ function GraiPage() {
       </FloatingTokenBackground>
       <aside className="grai-assets-chart-card" id="grai-assets-section" aria-label="GRAI assets composition">
           <div className="grai-assets-split">
-            <div className="grai-assets-panel">
-              <div className="grai-assets-overview">
-              <div className="grai-donut-slot grai-donut-slot--supply" aria-label="GRAI total supply">
-                <GraiNavDonut
-                  slices={supplyCompositionRows}
-                  totalNavLabel={totalSupplyLoading ? '…' : totalSupplyLabel}
-                  centerLabel="Total Supply"
-                  valueUnit="GRAI"
-                  isLoading={totalSupplyLoading || vaultBalancesLoading || mintAssetsLoading}
-                />
-              </div>
-              <div className="grai-donut-slot grai-donut-slot--senior">
-                <GraiNavDonut
-                  slices={compositionRows}
-                  totalNavLabel={totalNavLabel}
-                  centerLabel="Senior Vault NAV"
-                  isLoading={vaultBalancesLoading || mintAssetsLoading}
-                />
-              </div>
-              <div className="grai-donut-slot grai-donut-slot--junior">
-                <GraiNavDonut
-                  slices={juniorCompositionRows}
-                  totalNavLabel={totalJuniorNavLabel}
-                  centerLabel="Junior Vault NAV"
-                  isLoading={vaultBalancesLoading || mintAssetsLoading}
-                />
-              </div>
-              <div className="grai-donut-slot grai-donut-slot--allocated" aria-label="Allocated NAV">
-                <GraiNavDonut
-                  slices={allocatedCompositionRows}
-                  totalNavLabel={totalAllocatedNavLabel}
-                  centerLabel="Allocated NAV"
-                  isLoading={vaultBalancesLoading || mintAssetsLoading}
-                />
-              </div>
-              </div>
-              <div className="grai-donut-legend">
-              <div
-                className={`grai-balance-table ${isLegendTableHidden ? 'is-collapsed' : ''}`}
-                id="grai-vault-balance-table"
-                aria-label="Asset balances by vault"
-              >
+            <div className="grai-assets-composition-block">
+            <div className="grai-donut-slot grai-donut-slot--supply" aria-label="GRAI total supply">
+              <GraiNavDonut
+                slices={supplyCompositionRows}
+                totalNavLabel={totalSupplyLoading ? '…' : totalSupplyLabel}
+                centerLabel="Total Supply"
+                valueUnit="GRAI"
+                isLoading={totalSupplyLoading || vaultBalancesLoading || mintAssetsLoading}
+              />
+            </div>
+            <div className="grai-donut-slot grai-donut-slot--senior">
+              <GraiNavDonut
+                slices={compositionRows}
+                totalNavLabel={totalNavLabel}
+                centerLabel="Senior Vault NAV"
+                isLoading={vaultBalancesLoading || mintAssetsLoading}
+              />
+            </div>
+            <div className="grai-donut-slot grai-donut-slot--junior">
+              <GraiNavDonut
+                slices={juniorCompositionRows}
+                totalNavLabel={totalJuniorNavLabel}
+                centerLabel="Junior Vault NAV"
+                isLoading={vaultBalancesLoading || mintAssetsLoading}
+              />
+            </div>
+            <div className="grai-donut-slot grai-donut-slot--allocated" aria-label="Allocated NAV">
+              <GraiNavDonut
+                slices={allocatedCompositionRows}
+                totalNavLabel={totalAllocatedNavLabel}
+                centerLabel="Allocated NAV"
+                isLoading={vaultBalancesLoading || mintAssetsLoading}
+              />
+            </div>
+            <div className="grai-vault-balance-shell">
+            <div
+              className="grai-balance-table"
+              id="grai-vault-balance-table"
+              aria-label="Asset balances by vault"
+            >
                 <div className="grai-balance-table-row grai-balance-table-row--head">
                   <div className="grai-balance-table-cell grai-balance-table-cell--head grai-balance-table-cell--asset is-asset">
-                    <button
-                      type="button"
-                      className={`grai-donut-legend-toggle ${isLegendTableHidden ? 'is-collapsed' : ''}`}
-                      onClick={() => setIsLegendTableHidden((hidden) => !hidden)}
-                      aria-expanded={!isLegendTableHidden}
-                      aria-controls="grai-vault-balance-table"
-                      aria-label={isLegendTableHidden ? 'Show vault balances table' : 'Hide vault balances table'}
-                    >
-                      <svg
-                        className="grai-donut-legend-toggle-icon"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </button>
                     <span className="grai-balance-table-col-icon">{BALANCE_COLUMN_ICONS.assets}</span>
                     Assets
                   </div>
@@ -1461,8 +1443,12 @@ function GraiPage() {
                     Allocated
                   </div>
                 </div>
-                {!isLegendTableHidden && (
-                <>
+                <div
+                  className={`grai-vault-balance-body-panel${isLegendTableHidden ? '' : ' is-open'}`}
+                  aria-hidden={isLegendTableHidden}
+                >
+                  <div className="grai-vault-balance-body-panel-inner">
+                    <div className="grai-vault-balance-body-grid">
                 {mintAssetsLoading ? (
                   <div className="grai-balance-table-row">
                     <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell">
@@ -1514,11 +1500,36 @@ function GraiPage() {
                     </div>
                   ))
                 )}
-                </>
-                )}
-              </div>
+                    </div>
+                  </div>
+                </div>
+            </div>
+            <div className="grai-vault-balance-toggle">
+              <button
+                type="button"
+                className={`grai-donut-legend-toggle grai-vault-balance-show-toggle ${isLegendTableHidden ? 'is-collapsed' : ''}`}
+                onClick={() => setIsLegendTableHidden((hidden) => !hidden)}
+                aria-expanded={!isLegendTableHidden}
+                aria-controls="grai-vault-balance-table"
+                aria-label={isLegendTableHidden ? 'Show vault balances table' : 'Hide vault balances table'}
+              >
+                <svg
+                  className="grai-donut-legend-toggle-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
             </div>
             </div>
+            </div>
+            <GraiManageSection />
           </div>
         </aside>
       <ChainSelectorModal
