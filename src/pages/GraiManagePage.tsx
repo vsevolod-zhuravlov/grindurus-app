@@ -262,20 +262,6 @@ function GraiManageAssetSelector({
               : selectedAsset?.symbol ??
                 (assets.length === 0 ? (emptyTriggerLabel ?? listEmptyMessage ?? '—') : '—')}
           </span>
-          {selectedAsset?.mint && (
-            <a
-              href={solscanTokenUrl(selectedAsset.mint)}
-              target="_blank"
-              rel="noreferrer"
-              className="grai-mint-asset-value-solscan"
-              aria-label={`View ${selectedAsset.symbol} on Solscan`}
-              title={`View ${selectedAsset.symbol} on Solscan`}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              {MINT_ASSET_SOLSCAN_ICON}
-            </a>
-          )}
         </button>
         <button
           type="button"
@@ -580,9 +566,16 @@ function GraiManageInputField({
   const hasSuffix = Boolean(suffix)
   const hasAll = allAmount !== undefined
   const labelNode = label ? (
-    <div className={`grai-mint-amount-header${labelPosition === 'above' ? ' is-above' : ''}`}>
-      <GraiFieldLabel icon={labelIcon}>{label}</GraiFieldLabel>
-    </div>
+    labelPosition === 'above' ? (
+      <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
+        {labelIcon ? <span className="grai-field-label-icon">{labelIcon}</span> : null}
+        {label}
+      </span>
+    ) : (
+      <div className="grai-mint-amount-header">
+        <GraiFieldLabel icon={labelIcon}>{label}</GraiFieldLabel>
+      </div>
+    )
   ) : null
 
   const inputBlock = (
@@ -1317,6 +1310,9 @@ export function GraiManageSection() {
 
           <GraiManageInputField
             id="grai-allocate-amount"
+            label="Transfer Amount"
+            labelPosition="above"
+            labelIcon={ACTION_TX_ICON}
             header={
               <div className="grai-mint-amount-header">
                 <GraiFieldLabel icon={ASSET_FIELD_ICON}>Junior vault balance</GraiFieldLabel>
@@ -1383,7 +1379,7 @@ export function GraiManageSection() {
                           <span className="grai-field-label-icon" aria-hidden="true">
                             {CUSTODY_FIELD_ICON}
                           </span>
-                          Custody +
+                          CUSTODY +
                         </span>
                         <span className="grai-burn-assets-amount-value">{allocateCustodyReceiveAmount}</span>
                       </span>
@@ -1495,6 +1491,9 @@ export function GraiManageSection() {
 
           <GraiManageInputField
             id="grai-distribute-amount"
+            label="Transfer Amount"
+            labelPosition="above"
+            labelIcon={ACTION_TX_ICON}
             header={
               <div className="grai-mint-amount-header">
                 <GraiFieldLabel icon={ASSET_FIELD_ICON}>Custody balance</GraiFieldLabel>

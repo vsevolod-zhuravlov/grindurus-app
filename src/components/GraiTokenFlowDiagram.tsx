@@ -20,7 +20,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import './GraiTokenFlowDiagram.css'
 
-type FlowVariant = 'user' | 'grai' | 'senior' | 'junior' | 'custody' | 'treasury'
+type FlowVariant = 'user' | 'grai' | 'senior' | 'junior' | 'custody' | 'treasury' | 'aggregator'
 
 type GraiFlowNodeData = {
   label: string
@@ -34,6 +34,8 @@ type FlowDiagramConfig = {
   height: number
   fitPadding?: number
   centerInPane?: boolean
+  paneOffsetY?: number
+  fullWidth?: boolean
   nodes: Node<GraiFlowNodeData>[]
   edges: Edge[]
 }
@@ -60,10 +62,11 @@ function centerFlowInPane(
   instance: ReactFlowInstance<Node<GraiFlowNodeData>, Edge>,
   container: HTMLDivElement,
   zoom: number,
+  offsetY = 0,
 ) {
   const bounds = getNodesBounds(instance.getNodes())
   const x = (container.clientWidth - bounds.width * zoom) / 2 - bounds.x * zoom
-  const y = (container.clientHeight - bounds.height * zoom) / 2 - bounds.y * zoom
+  const y = (container.clientHeight - bounds.height * zoom) / 2 - bounds.y * zoom + offsetY
   instance.setViewport({ x, y, zoom })
 }
 
@@ -139,6 +142,70 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
         targetHandle: 'left',
         label: 'allocate',
         data: { straight: true, labelAlong: 0.5, labelAbove: true },
+        ...edgeDefaults,
+      },
+    ],
+  },
+  {
+    id: 'decision',
+    title: 'Decision',
+    description: 'Grinder Custody X evaluates strategy signals and decides the next action (buy/sell and how much).',
+    height: 190,
+    fitPadding: 0.28,
+    centerInPane: true,
+    paneOffsetY: 14,
+    nodes: [
+      { id: 'custody', type: 'graiFlow', position: { x: 100, y: 58 }, data: { label: 'Grinder Custody X', variant: 'custody' } },
+    ],
+    edges: [
+      {
+        id: 'make-decision',
+        source: 'custody',
+        target: 'custody',
+        sourceHandle: 'left-out',
+        targetHandle: 'right-in',
+        label: 'make decision',
+        data: { selfLoop: true, loopSide: 'top', loopOffset: 34, labelAbove: true, labelOffsetY: 4, labelNowrap: true },
+        ...edgeDefaults,
+      },
+    ],
+  },
+  {
+    id: 'swap',
+    title: 'Swap',
+    description:
+      'Grinder Custody X submits a swap intent to Swap Aggregator; executed swaps are settled back into custody.',
+    height: 190,
+    fitPadding: 0.24,
+    centerInPane: true,
+    nodes: [
+      { id: 'custody', type: 'graiFlow', position: { x: 0, y: 58 }, data: { label: 'Grinder Custody X', variant: 'custody' } },
+      {
+        id: 'aggregator',
+        type: 'graiFlow',
+        position: { x: 230, y: 58 },
+        data: { label: 'Swap Aggregator', variant: 'aggregator' },
+      },
+    ],
+    edges: [
+      {
+        id: 'swap-intent',
+        source: 'custody',
+        target: 'aggregator',
+        sourceHandle: 'top-out',
+        targetHandle: 'top',
+        label: '1. swap intent',
+        data: { labelAlong: 0.5, labelBelow: true, labelOffsetY: -18, stepOffset: 34, labelNowrap: true },
+        ...edgeDefaults,
+      },
+      {
+        id: 'swap-execution',
+        source: 'aggregator',
+        target: 'custody',
+        sourceHandle: 'bottom-out',
+        targetHandle: 'bottom-in',
+        label: '2. swap execution',
+        data: { labelAlong: 0.5, labelAbove: true, labelOffsetY: 18, stepOffset: 34, labelNowrap: true },
         ...edgeDefaults,
       },
     ],
@@ -242,6 +309,10 @@ const GraiFlowNode = memo(function GraiFlowNode({ data }: { data: GraiFlowNodeDa
 
 type GraiFlowEdgeData = {
   straight?: boolean
+  selfLoop?: boolean
+  loopOffset?: number
+  loopSide?: 'top' | 'bottom' | 'right'
+  stepOffset?: number
   labelNearSource?: boolean
   /** 0 = at source, 1 = on-path label anchor from React Flow */
   labelAlong?: number
@@ -251,6 +322,7 @@ type GraiFlowEdgeData = {
   labelOffsetX?: number
   labelOffsetY?: number
   labelProminent?: boolean
+  labelNowrap?: boolean
 }
 
 function GraiFlowEdge({
@@ -267,17 +339,48 @@ function GraiFlowEdge({
   data,
 }: EdgeProps) {
   const edgeData = data as GraiFlowEdgeData | undefined
-  const [edgePath, labelX, labelY] = edgeData?.straight
-    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-    : getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: 10,
-      })
+  let edgePath: string
+  let labelX: number
+  let labelY: number
+
+  if (edgeData?.selfLoop) {
+    const loopOffset = edgeData.loopOffset ?? 48
+    const loopSide = edgeData.loopSide ?? 'right'
+
+    if (loopSide === 'top') {
+      const arcY = Math.min(sourceY, targetY) - loopOffset
+      const outwardLeft = sourceX - loopOffset * 0.5
+      const outwardRight = targetX + loopOffset * 0.5
+      edgePath = `M ${sourceX},${sourceY} L ${outwardLeft},${sourceY} L ${outwardLeft},${arcY} L ${outwardRight},${arcY} L ${outwardRight},${targetY} L ${targetX},${targetY}`
+      labelX = (outwardLeft + outwardRight) / 2
+      labelY = arcY
+    } else if (loopSide === 'bottom') {
+      const arcY = Math.max(sourceY, targetY) + loopOffset
+      const outwardLeft = sourceX - loopOffset * 0.5
+      const outwardRight = targetX + loopOffset * 0.5
+      edgePath = `M ${sourceX},${sourceY} L ${outwardLeft},${sourceY} L ${outwardLeft},${arcY} L ${outwardRight},${arcY} L ${outwardRight},${targetY} L ${targetX},${targetY}`
+      labelX = (outwardLeft + outwardRight) / 2
+      labelY = arcY
+    } else {
+      const rightX = Math.max(sourceX, targetX) + loopOffset
+      edgePath = `M ${sourceX},${sourceY} L ${rightX},${sourceY} L ${rightX},${targetY} L ${targetX},${targetY}`
+      labelX = rightX
+      labelY = (sourceY + targetY) / 2
+    }
+  } else {
+    ;[edgePath, labelX, labelY] = edgeData?.straight
+      ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+      : getSmoothStepPath({
+          sourceX,
+          sourceY,
+          sourcePosition,
+          targetX,
+          targetY,
+          targetPosition,
+          borderRadius: 12,
+          offset: edgeData?.stepOffset,
+        })
+  }
   let displayX: number
   let displayY: number
 
@@ -290,11 +393,13 @@ function GraiFlowEdge({
     displayX = sourceX + (labelX - sourceX) * along
     displayY = sourceY + (labelY - sourceY) * along
     if (edgeData?.labelAbove) {
-      displayY -= 14
+      displayY -= 22
     }
     if (edgeData?.labelBelow) {
-      displayY += 14
+      displayY += 22
     }
+    displayX += edgeData?.labelOffsetX ?? 0
+    displayY += edgeData?.labelOffsetY ?? 0
   }
 
   return (
@@ -303,7 +408,7 @@ function GraiFlowEdge({
       {label ? (
         <EdgeLabelRenderer>
           <div
-            className={`nodrag nopan grai-flow-edge-label${edgeData?.labelProminent ? ' is-prominent' : ''}`}
+            className={`nodrag nopan grai-flow-edge-label${edgeData?.labelProminent ? ' is-prominent' : ''}${edgeData?.labelNowrap ? ' is-nowrap' : ''}`}
             style={{
               transform: `translate(-50%, -50%) translate(${displayX}px, ${displayY}px)`,
             }}
@@ -325,6 +430,7 @@ type FlowCanvasProps = {
   height: number
   fitPadding?: number
   centerInPane?: boolean
+  paneOffsetY?: number
 }
 
 function FlowCanvas({
@@ -333,38 +439,63 @@ function FlowCanvas({
   height,
   fitPadding = FLOW_FIT_PADDING,
   centerInPane = false,
+  paneOffsetY = 0,
 }: FlowCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const instanceRef = useRef<ReactFlowInstance<Node<GraiFlowNodeData>, Edge> | null>(null)
   const rafRef = useRef(0)
   const [isReady, setIsReady] = useState(false)
   const flowNodes = useMemo(() => nodes, [nodes])
   const flowEdges = useMemo(() => edges, [edges])
 
-  useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
+  const applyViewport = useCallback(() => {
+    const instance = instanceRef.current
+    const container = containerRef.current
+    if (!instance || !container) return
 
-  const onInit = useCallback((instance: ReactFlowInstance<Node<GraiFlowNodeData>, Edge>) => {
-    cancelAnimationFrame(rafRef.current)
-    setIsReady(false)
-    const zoom = FLOW_FIXED_ZOOM
-    const center = () => {
-      if (centerInPane && containerRef.current) {
-        centerFlowInPane(instance, containerRef.current, zoom)
-        return
-      }
-      void instance.fitView({
-        padding: fitPadding,
-        minZoom: zoom,
-        maxZoom: zoom,
-        duration: 0,
+    const padding = container.clientWidth < 520 ? 0.16 : fitPadding
+
+    instance.fitView({
+      padding,
+      maxZoom: FLOW_FIXED_ZOOM,
+      duration: 0,
+    })
+
+    if (centerInPane) {
+      requestAnimationFrame(() => {
+        const { zoom } = instance.getViewport()
+        centerFlowInPane(instance, container, zoom, paneOffsetY)
       })
     }
+  }, [centerInPane, fitPadding, paneOffsetY])
+
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        applyViewport()
+      })
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [applyViewport])
+
+  const onInit = useCallback((instance: ReactFlowInstance<Node<GraiFlowNodeData>, Edge>) => {
+    instanceRef.current = instance
+    cancelAnimationFrame(rafRef.current)
+    setIsReady(false)
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = requestAnimationFrame(() => {
-        center()
+        applyViewport()
         setIsReady(true)
       })
     })
-  }, [fitPadding, centerInPane])
+  }, [applyViewport])
 
   return (
     <div
@@ -399,7 +530,10 @@ export function GraiTokenFlowDiagram() {
   return (
     <div className="grai-token-flow" role="region" aria-label="GRAI token flow">
       {FLOW_DIAGRAMS.map((diagram, index) => (
-        <article className="grai-token-flow-step" key={diagram.id}>
+        <article
+          className={`grai-token-flow-step${diagram.fullWidth ? ' grai-token-flow-step--full' : ''}`}
+          key={diagram.id}
+        >
           <div className="grai-token-flow-step-head">
             <span className="grai-token-flow-step-title">
               {index + 1}. {diagram.title}
@@ -412,6 +546,7 @@ export function GraiTokenFlowDiagram() {
             height={diagram.height}
             fitPadding={diagram.fitPadding}
             centerInPane={diagram.centerInPane}
+            paneOffsetY={diagram.paneOffsetY}
           />
         </article>
       ))}

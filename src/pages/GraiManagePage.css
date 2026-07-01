@@ -177,6 +177,16 @@
   display: block;
 }
 
+.grai-manage-custody-vault .grai-manage-junior-vault-title,
+.grai-manage-custody-vault .grai-manage-junior-vault-title-icon {
+  color: #ff69b4;
+}
+
+[data-theme='light'] .grai-manage-custody-vault .grai-manage-junior-vault-title,
+[data-theme='light'] .grai-manage-custody-vault .grai-manage-junior-vault-title-icon {
+  color: #ff69b4;
+}
+
 .grai-manage-junior-vault-nav {
   font-size: 0.82rem;
   color: var(--text-secondary);
@@ -615,6 +625,42 @@
   margin-top: 0;
 }
 
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-input-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  width: 100%;
+  margin: 0.5rem 0 0.35rem;
+  text-align: left;
+  text-transform: none;
+  font-size: 1.12rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: #fff;
+}
+
+[data-theme='light'] .grai-manage-card .grai-mint-amount-field > .grai-mint-amount-input-label {
+  color: #000;
+}
+
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-input-label .grai-field-label-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #fff;
+}
+
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-input-label .grai-field-label-icon svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+[data-theme='light'] .grai-manage-card .grai-mint-amount-field > .grai-mint-amount-input-label .grai-field-label-icon {
+  color: #000;
+}
+
 .grai-manage-card .grai-mint-amount-block .grai-mint-split-shares-hint {
   margin-top: 0.35rem;
 }
@@ -1015,7 +1061,7 @@
 
 .grai-manage-custody-field .grai-mint-amount-header .grai-field-label,
 .grai-manage-custody-field .grai-mint-amount-header .grai-field-label-icon {
-  color: #fff;
+  color: #ff69b4;
   font-size: 1.12rem;
   font-weight: 600;
   font-family: inherit;
@@ -1035,7 +1081,7 @@
 
 [data-theme='light'] .grai-manage-custody-field .grai-mint-amount-header .grai-field-label,
 [data-theme='light'] .grai-manage-custody-field .grai-mint-amount-header .grai-field-label-icon {
-  color: #000;
+  color: #ff69b4;
 }
 
 .grai-manage-custody-field .grai-mint-asset-item.is-disabled {

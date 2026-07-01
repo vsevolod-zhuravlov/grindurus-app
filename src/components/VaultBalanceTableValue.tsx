@@ -3,7 +3,7 @@ import type { GraiAssetVaultBalances } from '../grai/fetchVaultBalances'
 import { USD_SCALE } from '../grai/tokenomics'
 
 export function formatVaultUsdLabel(usdRaw: bigint): string {
-  if (usdRaw <= 0n) return '$0'
+  if (usdRaw <= 0n) return '$0.00'
   return `$${formatVaultBalanceDisplay(usdRaw, USD_SCALE, 2)}`
 }
 

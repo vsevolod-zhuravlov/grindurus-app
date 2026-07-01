@@ -15,6 +15,14 @@
   margin: 0;
 }
 
+.grai-page-title-accent {
+  color: #ff69b4;
+}
+
+[data-theme='light'] .grai-page-title-accent {
+  color: #e91e8c;
+}
+
 .grai-page-header {
   display: flex;
   align-items: center;
@@ -76,6 +84,7 @@
   display: grid;
   grid-template-rows: 0fr;
   width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -2225,11 +2234,22 @@
   justify-content: flex-start;
 }
 
+.grai-action-card .grai-mint-split-shares-hint .grai-burn-assets-amount-value .grai-balance-table-value-amount,
+.grai-action-card .grai-burn-assets-hint .grai-burn-assets-amount-value .grai-balance-table-value-amount {
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
 .grai-action-card .grai-mint-split-shares-hint .grai-burn-assets-amount-value .grai-balance-table-value-usd,
 .grai-action-card .grai-burn-assets-hint .grai-burn-assets-amount-value .grai-balance-table-value-usd {
   font-size: 0.92rem;
   line-height: 1.2;
   font-weight: 600;
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .grai-action-card .grai-mint-split-shares-hint .grai-burn-assets-amount-value.is-placeholder .grai-balance-table-value-amount,
@@ -2240,8 +2260,6 @@
 .grai-action-card .grai-mint-split-shares-hint .grai-burn-assets-amount-value.is-placeholder .grai-balance-table-value-usd,
 .grai-action-card .grai-burn-assets-hint .grai-burn-assets-amount-value.is-placeholder .grai-balance-table-value-usd {
   color: var(--text-secondary);
-  font-size: 0.92rem;
-  line-height: 1.2;
 }
 
 .grai-action-card .grai-mint-split-shares-hint .grai-burn-assets-amount {
@@ -2787,6 +2805,14 @@
   color: var(--text-secondary);
 }
 
+.grai-estimated-amount-value.is-placeholder {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .grai-estimated-amount-value.is-placeholder {
+  color: var(--text-secondary);
+}
+
 [data-theme="light"] .grai-estimated-amount-value,
 [data-theme="light"] .grai-estimated-amount-suffix {
   color: #e91e8c;
@@ -2985,8 +3011,57 @@
 }
 
 .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value,
-.grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value {
+.grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value,
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value {
   min-height: 0;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value {
+  min-width: 0;
+  flex-shrink: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: auto;
+  line-height: 1.35rem;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value .grai-estimated-amount-value {
+  display: inline;
+  min-height: 0;
+  height: auto;
+  line-height: 1.2;
+  font-size: 1.35rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value .grai-estimated-amount-suffix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: auto;
+  line-height: 1.2;
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.01em;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-suffix .grai-mint-asset-item-icon {
+  width: 1.25rem;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-suffix .grai-mint-asset-item-icon img {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  object-fit: cover;
 }
 
 .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-prefix,
@@ -2999,6 +3074,22 @@
   height: 1.35rem;
   font-size: 1.12rem;
   line-height: 1.35rem;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-prefix-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: inherit;
+}
+
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-prefix-plus svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
 }
 
 .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-sigma {
@@ -3033,6 +3124,14 @@
   color: var(--text-primary);
 }
 
+.grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value.is-placeholder {
+  color: var(--text-secondary);
+  font-size: 1.12rem;
+  font-family: inherit;
+  font-weight: inherit;
+  letter-spacing: 0.02em;
+}
+
 .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value .grai-estimated-amount-hint {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3054,8 +3153,10 @@
   color: #e91e8c;
 }
 
-.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value,
-.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-suffix,
+[data-theme='light'] .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value.is-placeholder {
+  color: var(--text-secondary);
+}
+
 .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-hint {
   font-size: 1.35rem;
   font-weight: 600;
@@ -3068,9 +3169,17 @@
   color: #ff69b4;
 }
 
+.grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value.is-placeholder {
+  color: var(--text-secondary);
+}
+
 [data-theme='light'] .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value,
 [data-theme='light'] .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-suffix {
   color: #e91e8c;
+}
+
+[data-theme='light'] .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value.is-placeholder {
+  color: var(--text-secondary);
 }
 
 .grai-burn-assets-hint,
@@ -3139,7 +3248,7 @@
   flex-shrink: 0;
   width: 1rem;
   height: 1rem;
-  color: var(--grai-accent-blue);
+  color: #fff;
 }
 
 .grai-burn-assets-section-title-icon svg {
@@ -3150,6 +3259,10 @@
 
 [data-theme='light'] .grai-burn-assets-section-title,
 [data-theme='light'] .grai-burn-assets-section-title-label {
+  color: var(--text-primary);
+}
+
+[data-theme='light'] .grai-burn-assets-section-title-icon {
   color: var(--text-primary);
 }
 
@@ -3776,11 +3889,11 @@
 
   .grai-input-with-suffix .grai-input,
   .grai-mint-asset-value,
-  .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-value,
-  .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-suffix,
+  .grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value,
+  .grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value .grai-estimated-amount-value,
+  .grai-mint-amount-field > .grai-estimated-amount-label .grai-mint-estimate-value .grai-estimated-amount-suffix,
   .grai-mint-amount-field > .grai-estimated-amount-label .grai-estimated-amount-hint,
-  .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value,
-  .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value .grai-estimated-amount-hint,
+  .grai-mint-amount-field > .grai-burn-estimate-label .grai-burn-estimate-value:not(.is-placeholder),
   .grai-mint-amount-row .grai-burn-amount-suffix,
   .grai-burn-estimate-label,
   .grai-burn-assets-row {

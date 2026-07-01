@@ -454,6 +454,24 @@ function GraiWalletActorRow({
   )
 }
 
+function GraiEstimateSuffix() {
+  return (
+    <span className="grai-estimated-amount-suffix">
+      <span className="grai-mint-asset-item-icon" aria-hidden="true">
+        <img
+          src={assetUrl('logo.png')}
+          alt=""
+          width={20}
+          height={20}
+          loading="lazy"
+          decoding="async"
+        />
+      </span>
+      GRAI
+    </span>
+  )
+}
+
 function GraiPage() {
   const chartTheme = useDocumentChartTheme()
   const assetChartColors = useMemo(() => getAssetChartColors(chartTheme), [chartTheme])
@@ -675,7 +693,14 @@ function GraiPage() {
   return (
     <div className="grai-page">
       <div className="grai-page-header">
-        <h1>Grinders Artificial Index</h1>
+        <h1>
+          <span className="grai-page-title-accent">GR</span>
+          inders{' '}
+          <span className="grai-page-title-accent">A</span>
+          rtificial{' '}
+          <span className="grai-page-title-accent">I</span>
+          ndex
+        </h1>
         <div className="grai-page-info-group">
           <button
             type="button"
@@ -1068,10 +1093,22 @@ function GraiPage() {
                             <span className="grai-field-label-icon" aria-hidden="true">
                               <WalletIcon size={14} />
                             </span>
-                            MINTER + 
+                            <span className="grai-estimated-amount-prefix-label">MINTER</span>
+                            <span className="grai-estimated-amount-prefix-plus" aria-hidden="true">
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M12 5v14M5 12h14" />
+                              </svg>
+                            </span>
                           </span>
                           {mintAmount.trim() && (isEstimateLoading || estimatedGrai !== null) ? (
-                            <>
+                            <span className="grai-mint-estimate-value">
                               <span className="grai-estimated-amount-value">
                                 {isEstimateLoading ? (
                                   <span className="grai-estimate-spinner" aria-label="Calculating GRAI estimate" />
@@ -1080,12 +1117,15 @@ function GraiPage() {
                                 )}
                               </span>
                               {!isEstimateLoading && (
-                                <span className="grai-estimated-amount-suffix"> GRAI</span>
+                                <GraiEstimateSuffix />
                               )}
-                            </>
+                            </span>
                           ) : (
-                            <span className="grai-estimated-amount-hint">
-                              est. <span className="grai-estimated-amount-suffix">GRAI</span> minter receive
+                            <span className="grai-mint-estimate-value is-placeholder">
+                              <span className="grai-estimated-amount-value is-placeholder">
+                                0
+                              </span>
+                              <GraiEstimateSuffix />
                             </span>
                           )}
                         </p>
@@ -1132,14 +1172,14 @@ function GraiPage() {
                           [
                             {
                               key: 'senior',
-                              label: 'Sr. Vault +',
+                              label: 'SR. VAULT +',
                               hint: 'Amount transfered to Senior Vault as Collateral under GRAI',
                               shareLabel: seniorShareLabel,
                               shareUsdRaw: seniorShareUsdRaw,
                             },
                             {
                               key: 'junior',
-                              label: 'Jr. Vault +',
+                              label: 'JR. VAULT +',
                               hint: 'Amount transfered to Junior Vault as Yield Generation to Grinders',
                               shareLabel: juniorShareLabel,
                               shareUsdRaw: juniorShareUsdRaw,
@@ -1310,7 +1350,13 @@ function GraiPage() {
                               Σ
                             </span>
                           </span>
-                          <span className="grai-burn-estimate-value">
+                          <span
+                            className={`grai-burn-estimate-value${
+                              !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
+                                ? ' is-placeholder'
+                                : ''
+                            }`}
+                          >
                             {burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—') ? (
                               isBurnEstimateLoading ? (
                                 <span className="grai-estimate-spinner" aria-label="Calculating burn value estimate" />
@@ -1318,9 +1364,7 @@ function GraiPage() {
                                 `~${burnTotalUsdLabel}`
                               )
                             ) : (
-                              <span className="grai-estimated-amount-hint">
-                                est. sum burner receive
-                              </span>
+                              '$0'
                             )}
                           </span>
                         </p>
