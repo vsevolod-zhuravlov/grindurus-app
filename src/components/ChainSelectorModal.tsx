@@ -16,30 +16,52 @@ interface ChainSelectorModalProps {
 export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('evm')
   const [evmConnectError, setEvmConnectError] = useState('')
+  const [isHandingOffToRainbowKit, setIsHandingOffToRainbowKit] = useState(false)
   const { setSelectedChainType } = useWalletContext()
   const evmWallet = useEvmWallet()
   const solanaWallet = useSolanaWallet()
 
+  const openRainbowKit = useCallback(() => {
+    setIsHandingOffToRainbowKit(true)
+    evmWallet.connectWalletConnect()
+    requestAnimationFrame(() => onClose())
+  }, [evmWallet, onClose])
+
   useEffect(() => {
-    const html = document.documentElement
-    if (isOpen) {
-      html.style.overflow = 'hidden'
-    } else {
-      html.style.overflow = ''
-    }
-    return () => {
-      html.style.overflow = ''
-      document.body.style.overflow = ''
-      document.body.style.paddingRight = ''
-    }
+    if (isOpen) return
+    setIsHandingOffToRainbowKit(false)
   }, [isOpen])
 
+  const isWalletConnectConnector = useCallback((connector: { id: string; name: string }) => {
+    const id = connector.id.toLowerCase()
+    const name = connector.name.toLowerCase()
+    return id.includes('walletconnect') || name.includes('walletconnect')
+  }, [])
+
+  const getConnectorDisplayName = useCallback(
+    (connector: { id: string; name: string }) => {
+      if (isWalletConnectConnector(connector)) return 'Rainbow Kit (Wallet Connect)'
+      return connector.name
+    },
+    [isWalletConnectConnector],
+  )
+
   const handleEvmConnectorSelect = useCallback(
-    async (connectorId: string) => {
+    async (connector: { id: string; uid: string; name: string }) => {
       setEvmConnectError('')
       setSelectedChainType('evm')
+
       try {
-        await evmWallet.connectWithConnector(connectorId)
+        if (isWalletConnectConnector(connector)) {
+          if (!evmWallet.canOpenConnectModal) {
+            setEvmConnectError('WalletConnect failed. Check WalletConnect Project ID and try again.')
+            return
+          }
+          openRainbowKit()
+          return
+        }
+
+        await evmWallet.connectWithConnector(connector.uid)
         onClose()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -48,7 +70,7 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
         }
       }
     },
-    [setSelectedChainType, evmWallet, onClose]
+    [isWalletConnectConnector, openRainbowKit, setSelectedChainType, evmWallet, onClose]
   )
 
   const handleSolanaWalletSelect = useCallback(async (walletName: string) => {
@@ -59,19 +81,23 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
 
   const handleWalletConnectFallback = useCallback(() => {
     setSelectedChainType('evm')
-    evmWallet.connect()
-    onClose()
-  }, [setSelectedChainType, evmWallet, onClose])
+    if (!evmWallet.canOpenConnectModal) {
+      setEvmConnectError('WalletConnect failed. Check WalletConnect Project ID and try again.')
+      return
+    }
+    openRainbowKit()
+  }, [evmWallet, openRainbowKit, setSelectedChainType])
 
   const getConnectorIcon = (connector: { id: string; name: string; icon?: string }) => {
+    if (isWalletConnectConnector(connector)) {
+      return 'https://raw.githubusercontent.com/rainbow-me/rainbowkit/main/site/public/rainbow.svg'
+    }
     if (connector.icon) return connector.icon
     
     const iconMap: Record<string, string> = {
       'metaMask': 'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
       'walletConnect': 'https://avatars.githubusercontent.com/u/37784886?s=200&v=4',
       'walletConnectLegacy': 'https://avatars.githubusercontent.com/u/37784886?s=200&v=4',
-      'coinbaseWallet': 'https://www.coinbase.com/img/favicon/favicon-256.png',
-      'coinbaseWalletSDK': 'https://www.coinbase.com/img/favicon/favicon-256.png',
       'brave': 'https://brave.com/static-assets/images/brave-logo-sans-text.svg',
       'rabby': 'https://rabby.io/assets/images/logo.svg',
     }
@@ -90,8 +116,11 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
   if (!isOpen) return null
 
   return createPortal(
-    <div className="wallet-modal-backdrop" onClick={handleBackdropClick}>
-      <div className="wallet-modal">
+    <div
+      className={`wallet-modal-backdrop${isHandingOffToRainbowKit ? ' is-handing-off' : ''}`}
+      onClick={handleBackdropClick}
+    >
+      <div className="wallet-modal" onClick={(e) => e.stopPropagation()}>
         <div className="wallet-modal-header">
           <h2>
             <WalletIcon size={20} />
@@ -105,7 +134,8 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
         </div>
 
         <div className="wallet-modal-tabs">
-          <button 
+          <button
+            type="button"
             className={`wallet-tab ${activeTab === 'evm' ? 'active' : ''}`}
             onClick={() => setActiveTab('evm')}
           >
@@ -122,7 +152,8 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             </div>
             EVM
           </button>
-          <button 
+          <button
+            type="button"
             className={`wallet-tab ${activeTab === 'solana' ? 'active' : ''}`}
             onClick={() => setActiveTab('solana')}
           >
@@ -135,7 +166,8 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             </div>
             Solana
           </button>
-          <button 
+          <button
+            type="button"
             className={`wallet-tab ${activeTab === 'movevm' ? 'active' : ''}`}
             onClick={() => setActiveTab('movevm')}
           >
@@ -150,11 +182,10 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
         </div>
 
         <div className="wallet-modal-content">
-          <div className="wallet-modal-panels">
             <div
               className={`wallet-modal-panel${activeTab === 'evm' ? ' is-active' : ''}`}
               role="tabpanel"
-              aria-hidden={activeTab !== 'evm'}
+              hidden={activeTab !== 'evm'}
             >
               <div className="wallet-options">
                 {evmWallet.connectors.length > 0 ? (
@@ -163,16 +194,16 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                       key={connector.uid}
                       className="wallet-option-btn"
                       onClick={() => {
-                        void handleEvmConnectorSelect(connector.uid)
+                        void handleEvmConnectorSelect(connector)
                       }}
                     >
                       <img
                         src={getConnectorIcon(connector)}
-                        alt={connector.name}
+                        alt={getConnectorDisplayName(connector)}
                         className="wallet-icon"
                       />
                       <div className="wallet-option-info">
-                        <span className="wallet-option-name">{connector.name}</span>
+                        <span className="wallet-option-name">{getConnectorDisplayName(connector)}</span>
                         <span className="wallet-option-desc wallet-detected">Detected</span>
                       </div>
                     </button>
@@ -181,7 +212,7 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                   <div className="no-wallets-message">
                     <p>No EVM wallets detected</p>
                     <p className="no-wallets-hint">
-                      Install MetaMask or use WalletConnect (Rainbow) to continue
+                      Install MetaMask or use Rainbow Kit to continue
                     </p>
                     <button
                       type="button"
@@ -189,12 +220,12 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                       onClick={handleWalletConnectFallback}
                     >
                       <img
-                        src="https://avatars.githubusercontent.com/u/37784886?s=200&v=4"
-                        alt="WalletConnect"
+                        src="https://raw.githubusercontent.com/rainbow-me/rainbowkit/main/site/public/rainbow.svg"
+                        alt="Rainbow Kit (Wallet Connect)"
                         className="wallet-icon"
                       />
                       <div className="wallet-option-info">
-                        <span className="wallet-option-name">WalletConnect (Rainbow)</span>
+                        <span className="wallet-option-name">Rainbow Kit (Wallet Connect)</span>
                         <span className="wallet-option-desc wallet-detected">Open QR modal</span>
                       </div>
                     </button>
@@ -207,7 +238,7 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             <div
               className={`wallet-modal-panel${activeTab === 'solana' ? ' is-active' : ''}`}
               role="tabpanel"
-              aria-hidden={activeTab !== 'solana'}
+              hidden={activeTab !== 'solana'}
             >
               <div className="wallet-options">
                 {solanaWallet.detectedWallets.length > 0 ? (
@@ -249,7 +280,7 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             <div
               className={`wallet-modal-panel${activeTab === 'movevm' ? ' is-active' : ''}`}
               role="tabpanel"
-              aria-hidden={activeTab !== 'movevm'}
+              hidden={activeTab !== 'movevm'}
             >
               <div className="wallet-options">
                 <div className="no-wallets-message">
@@ -258,7 +289,6 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                 </div>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>,

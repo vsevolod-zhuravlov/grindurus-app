@@ -80,9 +80,11 @@
 
 .grai-manage-cards {
   display: flex;
+  align-items: stretch;
   justify-content: center;
+  gap: 1.5rem;
   width: 100%;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
 }
 
 .grai-manage-card.grai-manage-action-card {
@@ -91,6 +93,15 @@
   min-width: 260px;
   padding: 0.5rem 1.5rem 1.5rem;
   gap: 0;
+  box-sizing: border-box;
+  flex: 1 1 50%;
+}
+
+.grai-manage-custody-vault {
+  width: 50%;
+  max-width: 50%;
+  min-width: 0;
+  flex: 1 1 50%;
   box-sizing: border-box;
 }
 
@@ -108,26 +119,6 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-}
-
-.grai-manage-vaults-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  align-items: stretch;
-  width: 100%;
-}
-
-@media (max-width: 900px) {
-  .grai-manage-vaults-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.grai-manage-junior-vault,
-.grai-manage-custody-vault {
-  width: 100%;
-  min-width: 0;
 }
 
 .grai-manage-junior-vault-header {
@@ -187,17 +178,6 @@
   color: #ff69b4;
 }
 
-.grai-manage-junior-vault-nav {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.grai-manage-junior-vault-nav strong {
-  color: var(--grai-accent-blue);
-  font-weight: 800;
-}
-
 .grai-manage-vault-table-shell {
   display: flex;
   flex-direction: column;
@@ -250,13 +230,6 @@
   box-shadow: none;
 }
 
-.grai-manage-junior-vault-body-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: 100%;
-  min-width: 0;
-}
-
 .grai-manage-custody-vault-body-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) repeat(2, minmax(0, 1fr));
@@ -264,18 +237,8 @@
   min-width: 0;
 }
 
-.grai-manage-junior-vault-body-grid .grai-balance-table-row .grai-balance-table-cell,
 .grai-manage-custody-vault-body-grid .grai-balance-table-row .grai-balance-table-cell {
   border-top: 1px solid var(--border-color);
-}
-
-.grai-manage-junior-vault-table {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.grai-manage-junior-vault-table .grai-balance-table-cell--head {
-  justify-content: flex-start;
-  text-align: left;
 }
 
 .grai-manage-custody-vault-table {
@@ -363,9 +326,16 @@
 }
 
 @media (max-width: 980px) {
-  .grai-manage-card.grai-manage-action-card {
+  .grai-manage-cards {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .grai-manage-card.grai-manage-action-card,
+  .grai-manage-custody-vault {
     width: 100%;
     max-width: 100%;
+    flex: 1 1 auto;
   }
 }
 
@@ -393,15 +363,8 @@
     overflow: visible;
   }
 
-  .grai-manage-junior-vault-body-grid,
   .grai-manage-custody-vault-body-grid {
     overflow: visible;
-  }
-
-  .grai-manage-junior-vault-table,
-  .grai-manage-junior-vault-body-grid {
-    grid-template-columns: repeat(3, 9.67rem);
-    min-width: 29rem;
   }
 
   .grai-manage-custody-vault-table,
@@ -661,12 +624,32 @@
   color: #000;
 }
 
-.grai-manage-card .grai-mint-amount-block .grai-mint-split-shares-hint {
-  margin-top: 0.35rem;
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 1.5rem;
+  margin: 0.4rem 0 0;
+  color: rgba(255, 105, 180, 0.8);
 }
 
-.grai-manage-card .grai-mint-split-shares-hint .grai-burn-assets-rows {
-  padding-left: 1.35rem;
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-flow-arrow svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: block;
+}
+
+.grai-manage-card .grai-mint-amount-field > .grai-mint-amount-flow-arrow + .grai-mint-split-shares-hint {
+  margin-top: 0.2rem;
+}
+
+[data-theme='light'] .grai-manage-card .grai-mint-amount-field > .grai-mint-amount-flow-arrow {
+  color: rgba(233, 30, 140, 0.85);
+}
+
+.grai-manage-card .grai-mint-amount-block .grai-mint-split-shares-hint {
+  margin-top: 0;
 }
 
 .grai-manage-card .grai-mint-split-shares-hint .grai-burn-assets-token {
@@ -706,7 +689,18 @@
   flex-shrink: 0;
   width: 1rem;
   height: 1rem;
+}
+
+.grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix .grai-field-label-icon {
+  color: #ff69b4;
+}
+
+.grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix-icon {
   color: #fff;
+}
+
+.grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix-icon.is-senior {
+  color: var(--grai-accent-blue);
 }
 
 .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix .grai-field-label-icon svg,
@@ -716,10 +710,20 @@
   display: block;
 }
 
-[data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix,
-[data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix .grai-field-label-icon,
+[data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix {
+  color: var(--text-primary);
+}
+
+[data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix .grai-field-label-icon {
+  color: #e91e8c;
+}
+
 [data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix-icon {
   color: var(--text-primary);
+}
+
+[data-theme='light'] .grai-manage-card .grai-mint-split-shares-hint .grai-mint-split-vault-prefix-icon.is-senior {
+  color: var(--grai-accent-blue);
 }
 
 .grai-manage-card .grai-mint-amount-row {
@@ -941,7 +945,7 @@
 }
 
 .grai-manage-protocol-info-block {
-  margin: 0 0 1rem;
+  margin: 1rem 0 0;
   width: 100%;
   align-self: flex-start;
   text-align: left;

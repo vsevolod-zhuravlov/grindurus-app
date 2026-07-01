@@ -189,20 +189,38 @@ function formatGrinderUsdTotal(value: number): string {
   return `${sign}$${abs.toLocaleString('en-US')}`
 }
 
-const CONTRACT_ICON = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M8 3h8l4 4v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />
-    <path d="M16 3v5h5" />
-    <path d="M8 13h8" />
-    <path d="M8 17h6" />
-  </svg>
-)
-
 const BALANCE_FIELD_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <ellipse cx="12" cy="7" rx="8" ry="3" />
     <path d="M4 7v4c0 1.7 3.6 3 8 3s8-1.3 8-3V7" />
     <path d="M4 11v4c0 1.7 3.6 3 8 3s8-1.3 8-3v-4" />
+  </svg>
+)
+
+const SENIOR_VAULT_FIELD_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3l7 4v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4z" />
+  </svg>
+)
+
+const JUNIOR_VAULT_FIELD_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+)
+
+const AMOUNT_PREFIX_PLUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M8 12h8" />
+    <path d="M12 8v8" />
+  </svg>
+)
+
+const VAULT_AMOUNT_PLUS_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
   </svg>
 )
 
@@ -454,7 +472,7 @@ function GraiWalletActorRow({
   )
 }
 
-function GraiEstimateSuffix() {
+function GraiEstimateSuffix({ solscanHref }: { solscanHref?: string | null }) {
   return (
     <span className="grai-estimated-amount-suffix">
       <span className="grai-mint-asset-item-icon" aria-hidden="true">
@@ -468,6 +486,18 @@ function GraiEstimateSuffix() {
         />
       </span>
       GRAI
+      {solscanHref ? (
+        <a
+          href={solscanHref}
+          target="_blank"
+          rel="noreferrer"
+          className="grai-mint-asset-value-solscan"
+          aria-label="View GRAI contract on Solscan"
+          title="View GRAI contract on Solscan"
+        >
+          {MINT_ASSET_SOLSCAN_ICON}
+        </a>
+      ) : null}
     </span>
   )
 }
@@ -475,7 +505,7 @@ function GraiEstimateSuffix() {
 function GraiPage() {
   const chartTheme = useDocumentChartTheme()
   const assetChartColors = useMemo(() => getAssetChartColors(chartTheme), [chartTheme])
-  const { solana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl, clusterMismatch, solanaCluster, isConfigured } = useGraiDeployment()
+  const { solana, staticSolana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl, clusterMismatch, solanaCluster, hasStaticConfig, protocolError } = useGraiDeployment()
   const {
     assets: mintAssets,
     isLoading: mintAssetsLoading,
@@ -498,7 +528,6 @@ function GraiPage() {
   const [isLegendTableHidden, setIsLegendTableHidden] = useState(false)
   const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
-  const [isMintSplitSharesHidden, setIsMintSplitSharesHidden] = useState(true)
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
   const [hasTokenFlowMounted, setHasTokenFlowMounted] = useState(false)
@@ -565,7 +594,8 @@ function GraiPage() {
     if (totalUsd <= 0n) return '$0'
     return `$${formatVaultBalanceDisplay(totalUsd, USD_SCALE)}`
   }, [burnAmount, burnOutputs, isBurnEstimateLoading])
-  const graiMintAddress = solana?.graiMint.toBase58() ?? '—'
+  const graiMintAddress = solana?.graiMint.toBase58() ?? staticSolana?.graiMint.toBase58() ?? '—'
+  const graiSolscanHref = graiMintAddress !== '—' ? solscanTokenUrl(graiMintAddress) : null
   const {
     balanceLabel: graiBalanceLabel,
     maxAmount: maxBurnAmount,
@@ -740,44 +770,38 @@ function GraiPage() {
         </div>
       </div>
 
-      <div className="grai-page-meta">
-        {clusterMismatch && (
-          <p className="grai-page-network-warning" role="status">
-            Switch your Solana wallet to {solanaCluster === 'mainnet-beta' ? 'Mainnet' : solanaCluster} to mint or burn GRAI.
-          </p>
-        )}
-        {!isConfigured && (
-          <p className="grai-page-network-warning" role="status">
-            GRAI is not configured for this network. Set deployment env vars before using the app.
-          </p>
-        )}
-        <p className="grai-page-ca">
-          <span className="grai-page-ca-label grai-page-ca-label--with-icon">
-            <span className="grai-field-label-icon" aria-hidden="true">
-              {CONTRACT_ICON}
-            </span>
-            CA:
-          </span>{' '}
-          <a
-            href={solscanTokenUrl(graiMintAddress)}
-            target="_blank"
-            rel="noreferrer"
-            className="grai-page-ca-link"
-            title={graiMintAddress}
-          >
-            <span className="grai-page-ca-link-text">{graiMintAddress}</span>
-            <span className="grai-page-ca-link-icon">{MINT_ASSET_SOLSCAN_ICON}</span>
-          </a>
-        </p>
-      </div>
+      {(clusterMismatch || !hasStaticConfig || protocolError) && (
+        <div className="grai-page-meta">
+          {clusterMismatch && (
+            <p className="grai-page-network-warning" role="status">
+              Switch your Solana wallet to {solanaCluster === 'mainnet-beta' ? 'Mainnet' : solanaCluster} to mint or burn GRAI.
+            </p>
+          )}
+          {!hasStaticConfig && (
+            <p className="grai-page-network-warning" role="status">
+              GRAI is not configured for this network. Set deployment env vars before using the app.
+            </p>
+          )}
+          {protocolError && (
+            <p className="grai-page-network-warning" role="status">
+              {protocolError}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grai-bottom-row">
         <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
           <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
             <span className="grai-grinders-summary-leading" style={{ gridColumn: '1 / span 2' }}>
-              <span role="columnheader" className="grai-grinders-group-general">
-                <span className="grai-grinder-active-dot" aria-hidden="true" />
-                {KNOWN_GRINDERS.length} grinders
+              <span role="columnheader" className="grai-grinders-group-general is-stacked">
+                <span className="grai-grinders-group-general-top">
+                  <span className="grai-grinder-active-dot" aria-hidden="true" />
+                  <span className="grai-grinders-live-label">LIVE</span>
+                </span>
+                <span className="grai-grinders-group-general-value">
+                  {KNOWN_GRINDERS.length}/{KNOWN_GRINDERS.length} grinders
+                </span>
               </span>
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-uptime is-stacked" style={{ gridColumn: 3 }}>
@@ -1088,98 +1112,64 @@ function GraiPage() {
                         </div>
                       </div>
                       {!isMinting && !mintError && !(mintSignature && mintStatus === 'success') ? (
-                        <p className="grai-estimated-amount-label">
-                          <span className="grai-estimated-amount-prefix" aria-label="Amount">
-                            <span className="grai-field-label-icon" aria-hidden="true">
-                              <WalletIcon size={14} />
-                            </span>
-                            <span className="grai-estimated-amount-prefix-label">MINTER</span>
-                            <span className="grai-estimated-amount-prefix-plus" aria-hidden="true">
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M12 5v14M5 12h14" />
-                              </svg>
-                            </span>
-                          </span>
-                          {mintAmount.trim() && (isEstimateLoading || estimatedGrai !== null) ? (
-                            <span className="grai-mint-estimate-value">
-                              <span className="grai-estimated-amount-value">
-                                {isEstimateLoading ? (
-                                  <span className="grai-estimate-spinner" aria-label="Calculating GRAI estimate" />
-                                ) : (
-                                  estimatedGrai
-                                )}
-                              </span>
-                              {!isEstimateLoading && (
-                                <GraiEstimateSuffix />
-                              )}
-                            </span>
-                          ) : (
-                            <span className="grai-mint-estimate-value is-placeholder">
-                              <span className="grai-estimated-amount-value is-placeholder">
-                                0
-                              </span>
-                              <GraiEstimateSuffix />
-                            </span>
-                          )}
-                        </p>
-                      ) : null}
-                    </div>
-                    {mintAssetsError && !isRegistryLoaded && (
-                      <p className="grai-registry-hint is-error">{mintAssetsError}</p>
-                    )}
-                    <div className="grai-mint-split-shares-hint is-open" aria-label="Mint deposit split estimate">
-                      <div className="grai-burn-assets-section-title">
-                        <span className="grai-burn-assets-section-title-icon" aria-hidden="true">
-                          {ACTION_TX_ICON}
-                        </span>
-                        <span className="grai-burn-assets-section-title-label">TX PREVIEW</span>
-                        <button
-                          type="button"
-                          className={`grai-donut-legend-toggle ${isMintSplitSharesHidden ? 'is-collapsed' : ''}`}
-                          onClick={() => setIsMintSplitSharesHidden((hidden) => !hidden)}
-                          aria-expanded={!isMintSplitSharesHidden}
-                          aria-controls="grai-mint-split-shares"
-                          aria-label={
-                            isMintSplitSharesHidden
-                              ? 'Show split shares estimate'
-                              : 'Hide split shares estimate'
-                          }
-                        >
-                          <svg
-                            className="grai-donut-legend-toggle-icon"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </button>
-                      </div>
-                      {!isMintSplitSharesHidden && (
-                      <div id="grai-mint-split-shares" className="grai-burn-assets-rows">
+                        <>
+                          <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M6 9l6 6 6-6" />
+                            </svg>
+                          </div>
+                          <div className="grai-mint-split-shares-hint is-open" aria-label="Mint deposit split estimate">
+                            <div id="grai-mint-split-shares" className="grai-burn-assets-rows">
+                              <div className="grai-burn-assets-row grai-mint-estimate-row">
+                                <span className="grai-burn-assets-amount">
+                                  <span className="grai-estimated-amount-prefix" aria-label="Amount">
+                                    <span className="grai-field-label-icon" aria-hidden="true">
+                                      <WalletIcon size={14} />
+                                    </span>
+                                    <span className="grai-estimated-amount-prefix-label">MINTER</span>
+                                    <span className="grai-estimated-amount-prefix-plus" aria-hidden="true">
+                                      {AMOUNT_PREFIX_PLUS_ICON}
+                                    </span>
+                                    {mintAmount.trim() && (isEstimateLoading || estimatedGrai !== null) ? (
+                                      <span className="grai-estimated-amount-value">
+                                        {isEstimateLoading ? (
+                                          <span className="grai-estimate-spinner" aria-label="Calculating GRAI estimate" />
+                                        ) : (
+                                          estimatedGrai
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="grai-estimated-amount-value is-placeholder">0</span>
+                                    )}
+                                  </span>
+                                </span>
+                                <span className="grai-burn-assets-token grai-mint-estimate-token">
+                                  {!(mintAmount.trim() && isEstimateLoading) && (
+                                    <GraiEstimateSuffix solscanHref={graiSolscanHref} />
+                                  )}
+                                </span>
+                              </div>
                         {(
                           [
                             {
                               key: 'senior',
-                              label: 'SR. VAULT +',
+                              label: 'SR. VAULT',
+                              icon: SENIOR_VAULT_FIELD_ICON,
                               hint: 'Amount transfered to Senior Vault as Collateral under GRAI',
                               shareLabel: seniorShareLabel,
                               shareUsdRaw: seniorShareUsdRaw,
                             },
                             {
                               key: 'junior',
-                              label: 'JR. VAULT +',
+                              label: 'JR. VAULT',
+                              icon: JUNIOR_VAULT_FIELD_ICON,
                               hint: 'Amount transfered to Junior Vault as Yield Generation to Grinders',
                               shareLabel: juniorShareLabel,
                               shareUsdRaw: juniorShareUsdRaw,
@@ -1189,8 +1179,14 @@ function GraiPage() {
                           <div className="grai-burn-assets-row" key={row.key}>
                             <span className="grai-burn-assets-amount">
                               <span className="grai-mint-split-vault-prefix">
-                                <GraiFieldInfoButton hint={row.hint} />
+                                <span className={`grai-mint-split-vault-prefix-icon is-${row.key}`} aria-hidden="true">
+                                  {row.icon}
+                                </span>
                                 {row.label}
+                                <GraiFieldInfoButton hint={row.hint} />
+                                <span className="grai-mint-split-vault-plus" aria-hidden="true">
+                                  {VAULT_AMOUNT_PLUS_ICON}
+                                </span>
                               </span>
                               <span className={`grai-burn-assets-amount-value${!mintAmount.trim() ? ' is-placeholder' : ''}`}>
                                 <VaultBalanceTableValue
@@ -1222,9 +1218,14 @@ function GraiPage() {
                             </span>
                           </div>
                         ))}
-                      </div>
-                      )}
+                            </div>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
+                    {mintAssetsError && !isRegistryLoaded && (
+                      <p className="grai-registry-hint is-error">{mintAssetsError}</p>
+                    )}
                     </div>
                     {(isMinting || mintError || (mintSignature && mintStatus === 'success')) && (
                     <div className="grai-mint-feedback-slot">
@@ -1340,16 +1341,58 @@ function GraiPage() {
                         </span>
                       </div>
                       {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
-                        <p className="grai-estimated-amount-label grai-burn-estimate-label">
-                          <span className="grai-estimated-amount-prefix" aria-label="Burner">
-                            <span className="grai-field-label-icon" aria-hidden="true">
-                              <WalletIcon size={14} />
-                            </span>
-                            BURNER
-                            <span className="grai-burn-estimate-sigma" aria-hidden="true">
-                              Σ
-                            </span>
-                          </span>
+                        <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
+                      <div className="grai-burn-assets-section-title">
+                        <span className="grai-estimated-amount-prefix" aria-label="Burner">
+                          <button
+                            type="button"
+                            className={`grai-donut-legend-toggle grai-burn-assets-section-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
+                            onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
+                            aria-expanded={!isBurnAssetsRowsHidden}
+                            aria-controls="grai-burn-assets-rows"
+                            aria-label={
+                              isBurnAssetsRowsHidden
+                                ? 'Show senior vault shares breakdown'
+                                : 'Hide senior vault shares breakdown'
+                            }
+                          >
+                            <svg
+                              className="grai-donut-legend-toggle-icon"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M6 9l6 6 6-6" />
+                            </svg>
+                          </button>
+                          {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
+                            <>
+                              BURNER
+                              <span className="grai-burn-estimate-sigma" aria-hidden="true">
+                                Σ
+                              </span>
+                            </>
+                          ) : null}
+                        </span>
+                        {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
                           <span
                             className={`grai-burn-estimate-value${
                               !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
@@ -1367,47 +1410,18 @@ function GraiPage() {
                               '$0'
                             )}
                           </span>
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
-                      <div className="grai-burn-assets-section-title">
-                        <span className="grai-burn-assets-section-title-icon" aria-hidden="true">
-                          {ACTION_TX_ICON}
-                        </span>
-                        <span className="grai-burn-assets-section-title-label">TX PREVIEW</span>
-                        <button
-                          type="button"
-                          className={`grai-donut-legend-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
-                          onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
-                          aria-expanded={!isBurnAssetsRowsHidden}
-                          aria-controls="grai-burn-assets-rows"
-                          aria-label={
-                            isBurnAssetsRowsHidden
-                              ? 'Show senior vault shares breakdown'
-                              : 'Hide senior vault shares breakdown'
-                          }
-                        >
-                          <svg
-                            className="grai-donut-legend-toggle-icon"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </button>
+                        ) : null}
                       </div>
-                      {!isBurnAssetsRowsHidden && (
                       <div
-                        id="grai-burn-assets-rows"
-                        className={`grai-burn-assets-rows${mintAssets.length > 3 ? ' is-scrollable' : ''}`}
+                        className={`grai-burn-assets-rows-panel${isBurnAssetsRowsHidden ? '' : ' is-open'}`}
+                        aria-hidden={isBurnAssetsRowsHidden}
                       >
-                        {mintAssets.map((asset) => {
+                        <div className="grai-burn-assets-rows-panel-inner">
+                          <div
+                            id="grai-burn-assets-rows"
+                            className={`grai-burn-assets-rows${mintAssets.length > 3 ? ' is-scrollable' : ''}`}
+                          >
+                            {mintAssets.map((asset) => {
                           const output = burnOutputByMint.get(asset.mint)
                           return (
                             <div className="grai-burn-assets-row" key={asset.mint}>
@@ -1445,8 +1459,9 @@ function GraiPage() {
                             </div>
                           )
                         })}
+                          </div>
+                        </div>
                       </div>
-                      )}
                     </div>
                     </div>
                     {(isBurning || burnError || (burnSignature && burnStatus === 'success')) && (

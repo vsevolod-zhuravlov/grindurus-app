@@ -3,16 +3,20 @@ import { fetchGraiMintSupply } from '../grai/fetchGraiMintSupply'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 
 export function useGraiTotalSupply() {
-  const { connection, solana, isConfigured } = useGraiDeployment()
+  const { connection, solana, hasStaticConfig } = useGraiDeployment()
   const [totalSupplyLabel, setTotalSupplyLabel] = useState('…')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!connection || !solana || !isConfigured) {
+    if (!hasStaticConfig) {
       setTotalSupplyLabel('—')
       setError('GRAI is not configured for this network')
       setIsLoading(false)
+      return
+    }
+    if (!connection || !solana) {
+      setIsLoading(true)
       return
     }
 
@@ -27,7 +31,7 @@ export function useGraiTotalSupply() {
     } finally {
       setIsLoading(false)
     }
-  }, [connection, isConfigured, solana])
+  }, [connection, hasStaticConfig, solana])
 
   useEffect(() => {
     void refresh()

@@ -2,11 +2,12 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { Connection } from '@solana/web3.js'
 import { useWalletContext, type SolanaCluster } from '../providers/AppWalletProvider'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
-import { clearGraiStateCache } from './graiStateCache'
+import { deferAfterPaint } from '../utils/deferAfterPaint'
 import {
   createGraiConnection,
   getDefaultGraiSolanaCluster,
   GraiEvmConfig,
+  GraiSolanaConfig,
   GraiSolanaRuntime,
   resolveGraiEvmConfig,
   resolveGraiSolanaConfig,
@@ -20,8 +21,12 @@ type GraiDeploymentContextValue = {
   chainKind: 'solana' | 'evm' | null
   solanaCluster: SolanaCluster
   solana: GraiSolanaRuntime | null
+  staticSolana: GraiSolanaConfig | null
   evm: GraiEvmConfig | null
   connection: Connection | null
+  /** Env vars define a Solana deployment (mint + RPC URL). */
+  hasStaticConfig: boolean
+  /** On-chain protocol metadata resolved (program id, state PDA). */
   isConfigured: boolean
   isProtocolResolving: boolean
   protocolError: string | null
@@ -44,8 +49,9 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
     [staticSolana],
   )
   const [solana, setSolana] = useState<GraiSolanaRuntime | null>(null)
-  const [isProtocolResolving, setIsProtocolResolving] = useState(false)
+  const [isProtocolResolving, setIsProtocolResolving] = useState(() => staticSolana !== null)
   const [protocolError, setProtocolError] = useState<string | null>(null)
+  const hasStaticConfig = staticSolana !== null
 
   const evm = useMemo(() => {
     if (selectedChainType !== 'evm') return null
@@ -81,27 +87,31 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     setIsProtocolResolving(true)
     setProtocolError(null)
-    clearGraiStateCache()
 
-    void resolveGraiSolanaRuntime(connection, staticSolana)
-      .then((runtime) => {
-        if (!cancelled) {
-          setSolana(runtime)
-          setProtocolError(null)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setSolana(null)
-          setProtocolError(error instanceof Error ? error.message : 'Failed to resolve GRAI protocol')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsProtocolResolving(false)
-      })
+    const cancelDefer = deferAfterPaint(() => {
+      if (cancelled) return
+
+      void resolveGraiSolanaRuntime(connection, staticSolana)
+        .then((runtime) => {
+          if (!cancelled) {
+            setSolana(runtime)
+            setProtocolError(null)
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setSolana(null)
+            setProtocolError(error instanceof Error ? error.message : 'Failed to resolve GRAI protocol')
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setIsProtocolResolving(false)
+        })
+    })
 
     return () => {
       cancelled = true
+      cancelDefer()
     }
   }, [connection, staticSolana])
 
@@ -110,8 +120,10 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
       chainKind,
       solanaCluster,
       solana,
+      staticSolana,
       evm,
       connection,
+      hasStaticConfig,
       isConfigured: chainKind === 'solana' ? solana !== null : chainKind === 'evm' ? evm !== null : false,
       isProtocolResolving,
       protocolError,
@@ -125,10 +137,12 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
       clusterMismatch,
       connection,
       evm,
+      hasStaticConfig,
       isProtocolResolving,
       protocolError,
       solana,
       solanaCluster,
+      staticSolana,
     ],
   )
 

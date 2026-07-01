@@ -36,6 +36,8 @@ export function useEvmWallet() {
     const checkConnectors = async () => {
       const installed: string[] = []
       for (const c of connectors) {
+        // Only probe browser extensions; WalletConnect init network SDK on getProvider().
+        if (c.type !== 'injected') continue
         try {
           const provider = await c.getProvider()
           if (provider) {
@@ -47,7 +49,7 @@ export function useEvmWallet() {
       }
       setInstalledConnectors(installed)
     }
-    checkConnectors()
+    void checkConnectors()
   }, [connectors])
 
   const shortAddress = useMemo(() => {
@@ -70,8 +72,15 @@ export function useEvmWallet() {
     []
   )
 
+  const isCoinbaseConnector = useCallback((c: { id: string; name: string }) => {
+    const id = c.id.toLowerCase()
+    const name = c.name.toLowerCase()
+    return id.includes('coinbase') || name.includes('coinbase')
+  }, [])
+
   const detectedConnectors = useMemo(() => {
     const filtered = connectors.filter((c) => {
+      if (isCoinbaseConnector(c)) return false
       // Keep extension-based wallets only when provider is actually installed.
       if (c.type === 'injected') {
         if (c.name === 'Injected') return false
@@ -83,8 +92,7 @@ export function useEvmWallet() {
         }
         return installedConnectors.includes(c.uid)
       }
-      // Keep non-injected connectors (WalletConnect/Coinbase SDK, etc.)
-      // even without local extension provider.
+      // Keep non-injected connectors (e.g. WalletConnect) even without local extension.
       return true
     })
     const seen = new Set<string>()
@@ -93,7 +101,7 @@ export function useEvmWallet() {
       seen.add(c.name)
       return true
     })
-  }, [connectors, hasInjectedMetaMask, installedConnectors])
+  }, [connectors, hasInjectedMetaMask, installedConnectors, isCoinbaseConnector])
 
   const switchToChain = useCallback(
     (targetChainId: number) => {
@@ -114,18 +122,40 @@ export function useEvmWallet() {
     [switchChainAsync]
   )
 
+  const canOpenConnectModal = Boolean(openConnectModal)
+
   const connect = useCallback(() => {
+    if (!openConnectModal) return false
+    openConnectModal()
+    return true
+  }, [openConnectModal])
+
+  const connectWalletConnect = useCallback(() => {
     if (openConnectModal) {
       openConnectModal()
+      return true
     }
-  }, [openConnectModal])
+
+    const walletConnectConnector = connectors.find(
+      (c) =>
+        c.id.toLowerCase().includes('walletconnect') ||
+        c.name.toLowerCase().includes('walletconnect'),
+    )
+    if (!walletConnectConnector) return false
+
+    void wagmiConnectAsync({ connector: walletConnectConnector }).catch((error: unknown) => {
+      console.error('WalletConnect connect failed:', error)
+    })
+    return true
+  }, [connectors, openConnectModal, wagmiConnectAsync])
 
   const connectWithConnector = useCallback(
     async (connectorId: string) => {
-      const found = connectors.find((c) => c.id === connectorId || c.uid === connectorId)
-      if (found) {
-        await wagmiConnectAsync({ connector: found })
+      const found = connectors.find((c) => c.uid === connectorId || c.id === connectorId)
+      if (!found) {
+        throw new Error(`Connector not found: ${connectorId}`)
       }
+      await wagmiConnectAsync({ connector: found })
     },
     [connectors, wagmiConnectAsync]
   )
@@ -140,7 +170,9 @@ export function useEvmWallet() {
     connector,
     connectors: detectedConnectors,
     supportedChains,
+    canOpenConnectModal,
     connect,
+    connectWalletConnect,
     connectWithConnector,
     disconnect,
     switchToChain,

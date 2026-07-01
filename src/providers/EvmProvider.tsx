@@ -7,17 +7,22 @@ import { connectorsForWallets } from '@rainbow-me/rainbowkit'
 import {
   metaMaskWallet,
   walletConnectWallet,
-  coinbaseWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import '@rainbow-me/rainbowkit/styles.css'
+import '../rainbowkit-fix.css'
+import { startScrollLockGapPatch } from '../utils/patchScrollLockGap'
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'demo-project-id'
+
+if (import.meta.env.DEV && projectId === 'demo-project-id') {
+  console.warn('[GRAI] VITE_WALLETCONNECT_PROJECT_ID is missing; WalletConnect will not work.')
+}
 
 const connectors = connectorsForWallets(
   [
     {
       groupName: 'Recommended',
-      wallets: [metaMaskWallet, walletConnectWallet, coinbaseWallet],
+      wallets: [metaMaskWallet, walletConnectWallet],
     },
   ],
   {
@@ -54,11 +59,16 @@ function useDataThemeIsDark() {
   return isDark
 }
 
+function useScrollLockGapPatch() {
+  useEffect(() => startScrollLockGapPatch(), [])
+}
+
 interface EvmProviderProps {
   children: ReactNode
 }
 
 export function EvmProvider({ children }: EvmProviderProps) {
+  useScrollLockGapPatch()
   const isDark = useDataThemeIsDark()
   const rkTheme = isDark
     ? darkTheme({
@@ -77,7 +87,7 @@ export function EvmProvider({ children }: EvmProviderProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={rkTheme} modalSize="compact">
+        <RainbowKitProvider theme={rkTheme} modalSize="compact" locale="en-US">
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

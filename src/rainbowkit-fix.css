@@ -1,0 +1,5 @@
+/* After RainbowKit styles: html already uses scrollbar-gutter: stable */
+body[data-scroll-locked] {
+  margin: 0 !important;
+  padding: 0 !important;
+}

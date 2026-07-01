@@ -3,16 +3,20 @@ import { fetchGraiVaultBalances, type GraiAssetVaultBalances } from '../grai/fet
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 
 export function useGraiVaultBalances() {
-  const { connection, solana, isConfigured } = useGraiDeployment()
+  const { connection, solana, hasStaticConfig } = useGraiDeployment()
   const [vaultBalances, setVaultBalances] = useState<Record<string, GraiAssetVaultBalances>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!connection || !solana || !isConfigured) {
+    if (!hasStaticConfig) {
       setVaultBalances({})
       setError('GRAI is not configured for this network')
       setIsLoading(false)
+      return
+    }
+    if (!connection || !solana) {
+      setIsLoading(true)
       return
     }
 
@@ -27,7 +31,7 @@ export function useGraiVaultBalances() {
     } finally {
       setIsLoading(false)
     }
-  }, [connection, isConfigured, solana])
+  }, [connection, hasStaticConfig, solana])
 
   useEffect(() => {
     void refresh()

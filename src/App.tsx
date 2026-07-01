@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import GraiPage from './pages/GraiPage'
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
 import BacktestPage from './pages/BacktestPage'
 import Header, { type HeaderMainView } from './components/Header'
 import { isAtAppPath, stripBasePath, toAppPath } from './utils/appPaths'
 import { navigateToGraiSection } from './utils/graiNavigation'
 import './App.css'
+
+const GraiPage = lazy(() => import('./pages/GraiPage'))
 
 type AppRoute = 'grai' | 'grai-manage' | 'backtest'
 
@@ -66,7 +67,9 @@ function App() {
       <Header activeView={mainView} onViewChange={handleViewChange} />
       <main className={`App-main ${route === 'backtest' ? 'App-main--backtest' : ''}`}>
         {route === 'grai' || route === 'grai-manage' ? (
-          <GraiPage />
+          <Suspense fallback={null}>
+            <GraiPage />
+          </Suspense>
         ) : (
           <BacktestPage />
         )}

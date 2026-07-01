@@ -110,6 +110,13 @@
   font-size: 0.78rem;
   line-height: 1.35;
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grai-token-flow-step-desc-line {
+  display: block;
 }
 
 .grai-token-flow-canvas .react-flow {

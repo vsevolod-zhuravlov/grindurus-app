@@ -30,7 +30,7 @@ type GraiFlowNodeData = {
 type FlowDiagramConfig = {
   id: string
   title: string
-  description: string
+  description: string | string[]
   height: number
   fitPadding?: number
   centerInPane?: boolean
@@ -74,8 +74,11 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
   {
     id: 'mint',
     title: 'Mint',
-    description:
-      'User deposits assets into GRAI. The protocol splits capital across senior and junior vaults, then mints GRAI to the user.',
+    description: [
+      'Deposit assets to mint GRAI.',
+      'Part of your capital becomes collateral backing GRAI.',
+      'The other part is allocated to autonomous grinder strategies to generate yield.',
+    ],
     height: FLOW_CANVAS_HEIGHT,
     nodes: [
       { id: 'user', type: 'graiFlow', position: { x: 0, y: 50 }, data: { label: 'User', variant: 'user' } },
@@ -127,7 +130,8 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
   {
     id: 'allocate',
     title: 'Allocate',
-    description: 'Protocol authority moves capital from the junior vault into grinder custody wallets.',
+    description:
+      'The protocol allocates from Junior Vault to independent grinder custodies.',
     height: FLOW_CANVAS_HEIGHT,
     nodes: [
       { id: 'junior', type: 'graiFlow', position: { x: 0, y: 34 }, data: { label: 'Junior Vault', variant: 'junior' } },
@@ -148,8 +152,9 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
   },
   {
     id: 'decision',
-    title: 'Decision',
-    description: 'Grinder Custody X evaluates strategy signals and decides the next action (buy/sell and how much).',
+    title: 'Strategy',
+    description:
+      'Each grinder independently decides whether to buy, sell or hold assets.',
     height: 190,
     fitPadding: 0.28,
     centerInPane: true,
@@ -213,8 +218,10 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
   {
     id: 'distribute',
     title: 'Distribute',
-    description:
-      'Custody wallet sends earned yield back on-chain. Yield goes to senior vault; the remainder goes to treasury as fee.',
+    description: [
+      'Generated yield is sent back to the Senior Vault.',
+      'Treasury receives only protocol fees.',
+    ],
     height: FLOW_CANVAS_HEIGHT,
     nodes: [
       { id: 'custody', type: 'graiFlow', position: { x: 0, y: 30 }, data: { label: 'Grinder Custody X', variant: 'custody' } },
@@ -538,7 +545,15 @@ export function GraiTokenFlowDiagram() {
             <span className="grai-token-flow-step-title">
               {index + 1}. {diagram.title}
             </span>
-            <p className="grai-token-flow-step-desc">{diagram.description}</p>
+            <p className="grai-token-flow-step-desc">
+              {(Array.isArray(diagram.description) ? diagram.description : [diagram.description]).map(
+                (paragraph, paragraphIndex) => (
+                  <span className="grai-token-flow-step-desc-line" key={paragraphIndex}>
+                    {paragraph}
+                  </span>
+                ),
+              )}
+            </p>
           </div>
           <FlowCanvas
             nodes={diagram.nodes}

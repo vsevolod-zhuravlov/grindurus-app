@@ -40,12 +40,41 @@
   width: 1.5rem;
   height: 1.5rem;
   padding: 0;
-  border: 1px solid var(--border-color);
+  border: 0;
   border-radius: 999px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: linear-gradient(
+    120deg,
+    #ff69b4 0%,
+    #ff7dbc 22%,
+    #ff1493 45%,
+    #ff5fb1 68%,
+    #ff69b4 100%
+  );
+  background-size: 220% 220%;
+  animation: wallet-expand-gradient-flow 4.5s ease-in-out infinite;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 105, 180, 0.3);
   box-sizing: border-box;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition: box-shadow 0.2s ease, color 0.2s ease;
+}
+
+@keyframes wallet-expand-gradient-flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-expand-toggle {
+    animation: none;
+    background-size: auto;
+    background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  }
 }
 
 .wallet-expand-toggle-icon {
@@ -60,9 +89,8 @@
 }
 
 .wallet-info-btn:hover .wallet-expand-toggle {
-  color: var(--text-primary);
-  border-color: rgba(255, 105, 180, 0.45);
-  background: rgba(255, 105, 180, 0.08);
+  color: #fff;
+  box-shadow: 0 3px 14px rgba(255, 105, 180, 0.42);
 }
 
 .connect-wallet-btn:hover:not(:disabled) {
@@ -87,6 +115,14 @@
   to { transform: rotate(360deg); }
 }
 
+/* Lock scroll while our wallet modal or RainbowKit modal is open */
+html:has(.wallet-modal-backdrop),
+html:has(.wallet-modal-backdrop) body,
+html:has(body[data-scroll-locked]),
+html:has(body[data-scroll-locked]) body {
+  overflow: hidden;
+}
+
 /* Modal Backdrop */
 .wallet-modal-backdrop {
   position: fixed;
@@ -96,8 +132,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   animation: fadeIn 0.2s ease;
+}
+
+.wallet-modal-backdrop.is-handing-off {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation: none;
 }
 
 @keyframes fadeIn {
@@ -113,6 +156,8 @@
   width: 100%;
   max-width: 400px;
   overflow: hidden;
+  position: relative;
+  isolation: isolate;
   box-shadow: 0 25px 80px rgba(255, 105, 180, 0.15),
               0 0 0 1px rgba(255, 255, 255, 0.05);
   animation: slideUp 0.3s ease;
@@ -173,6 +218,8 @@
 
 .wallet-modal-tabs {
   display: flex;
+  position: relative;
+  z-index: 2;
   padding: 0 1.25rem;
   gap: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -193,6 +240,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
 }
 
 .wallet-tab:hover {
@@ -239,31 +288,17 @@
 }
 
 .wallet-modal-content {
+  position: relative;
+  z-index: 1;
   padding: 1.1rem 1.25rem 1.35rem;
 }
 
-.wallet-modal-panels {
-  display: grid;
-}
-
 .wallet-modal-panel {
-  grid-area: 1 / 1;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.18s ease, visibility 0.18s ease;
+  display: none;
 }
 
 .wallet-modal-panel.is-active {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wallet-modal-panel {
-    transition: none;
-  }
+  display: block;
 }
 
 .wallet-options::-webkit-scrollbar {

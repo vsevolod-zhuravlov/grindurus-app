@@ -10,7 +10,7 @@ import { seniorVaultPda } from '../grai/pdas'
 import { KNOWN_GRINDERS, grinderCustodyAddress } from '../grai/grinders'
 import type { GrinderCustodyState } from '../hooks/useGrindersCustodyBalances'
 import type { CustodyNetwork } from '../grai/custodyHoldings'
-import { USD_SCALE, yieldSplit } from '../grai/tokenomics'
+import { yieldSplit } from '../grai/tokenomics'
 import { useGraiAllocate } from '../hooks/useGraiAllocate'
 import { useGraiAssets } from '../hooks/useGraiAssets'
 import { useGraiDistribute } from '../hooks/useGraiDistribute'
@@ -38,6 +38,15 @@ const TREASURY_WALLET_ICON = (
     <path d="M5 10V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
     <path d="M3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8" />
     <path d="M16 14h.01" />
+  </svg>
+)
+
+const CONTRACT_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 3h8l4 4v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />
+    <path d="M16 3v5h5" />
+    <path d="M8 13h8" />
+    <path d="M8 17h6" />
   </svg>
 )
 
@@ -620,35 +629,38 @@ function GraiManageInputField({
         inputBlock
       )}
       {labelPosition === 'below' && labelNode}
+      {footer ? (
+        <>
+          <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </div>
+          {footer}
+        </>
+      ) : null}
     </div>
   )
 
-  if (header) {
-    return (
-      <div className="grai-mint-amount-block">
-        {amountField}
-        {footer}
-      </div>
-    )
-  }
-
-  if (footer) {
-    return (
-      <>
-        {amountField}
-        {footer}
-      </>
-    )
+  if (header || footer) {
+    return <div className="grai-mint-amount-block">{amountField}</div>
   }
 
   return amountField
 }
 
 export function GraiManageSection() {
-  const { connection, solana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl, isConfigured } =
+  const { connection, solana, staticSolana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl, isConfigured, hasStaticConfig, protocolError } =
     useGraiDeployment()
   const { assets, isLoading: assetsLoading, error: assetsError } = useGraiAssets()
-  const { vaultBalances, isLoading: vaultBalancesLoading, error: vaultBalancesError, refresh: refreshVaultBalances } =
+  const { vaultBalances, isLoading: vaultBalancesLoading, refresh: refreshVaultBalances } =
     useGraiVaultBalances()
   const solanaWallet = useSolanaWallet()
 
@@ -674,12 +686,11 @@ export function GraiManageSection() {
   const [treasuryWalletCopied, setTreasuryWalletCopied] = useState(false)
   const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
   const [isCustodyTableHidden, setIsCustodyTableHidden] = useState(false)
-  const [isJuniorVaultTableHidden, setIsJuniorVaultTableHidden] = useState(false)
-  const [isDistributeDistributionHidden, setIsDistributeDistributionHidden] = useState(true)
-  const [isAllocateAllocationHidden, setIsAllocateAllocationHidden] = useState(true)
   const [distributeYieldSplitBps, setDistributeYieldSplitBps] = useState<number | null>(null)
   const [manageActionView, setManageActionView] = useState<'allocate' | 'distribute'>('allocate')
   const [walletWarningDismissed, setWalletWarningDismissed] = useState(false)
+
+  const graiMintAddress = solana?.graiMint.toBase58() ?? staticSolana?.graiMint.toBase58() ?? null
 
   const handleManageActionViewChange = useCallback((view: 'allocate' | 'distribute') => {
     setManageActionView(view)
@@ -783,29 +794,6 @@ export function GraiManageSection() {
   }, [allocateAmount])
 
   const allocateCustodyReceiveSymbol = allocateAsset?.symbol?.trim() || '—'
-
-  const juniorVaultRows = useMemo(
-    () =>
-      assets.map((asset) => {
-        const vault = vaultBalances[asset.mint]
-        return {
-          asset,
-          idle: vault ? formatVaultBalanceDisplay(vault.juniorRaw, vault.decimals) : '—',
-          allocated: vault ? formatVaultBalanceDisplay(vault.allocatedRaw, vault.decimals) : '—',
-          idleUsdRaw: vault?.juniorUsdRaw ?? 0n,
-          allocatedUsdRaw: vault?.allocatedUsdRaw ?? 0n,
-          juniorUsdRaw: vault?.juniorUsdRaw ?? 0n,
-        }
-      }),
-    [assets, vaultBalances],
-  )
-
-  const totalJuniorNavLabel = useMemo(() => {
-    if (vaultBalancesLoading || assetsLoading) return '…'
-    const totalJuniorUsdRaw = juniorVaultRows.reduce((sum, row) => sum + row.juniorUsdRaw, 0n)
-    if (totalJuniorUsdRaw <= 0n) return '—'
-    return `$${formatVaultBalanceDisplay(totalJuniorUsdRaw, USD_SCALE, 2)}`
-  }, [assetsLoading, juniorVaultRows, vaultBalancesLoading])
 
   useEffect(() => {
     if (assets.length === 0) return
@@ -1135,104 +1123,16 @@ export function GraiManageSection() {
   )
 
   return (
-    <div className="grai-manage-section" id="grai-manage-section">
-      {!isConfigured && (
-        <p className="grai-manage-feedback is-error">GRAI is not configured for this network.</p>
-      )}
+    <>
+      <div className="grai-manage-section" id="grai-manage-section">
+        {!hasStaticConfig && (
+          <p className="grai-manage-feedback is-error">GRAI is not configured for this network.</p>
+        )}
+        {protocolError && (
+          <p className="grai-manage-feedback is-error">{protocolError}</p>
+        )}
 
-      {(protocolAuthority || treasuryWallet) && (
-        <div className="grai-manage-protocol-info-block">
-          {protocolAuthority && (
-            <p className="grai-page-ca grai-manage-protocol-info">
-              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
-                <span className="grai-field-label-icon" aria-hidden="true">
-                  {PROTOCOL_AUTHORITY_ICON}
-                </span>
-                Protocol authority:
-              </span>{' '}
-              <a
-                href={solscanAccountUrl(protocolAuthority)}
-                target="_blank"
-                rel="noreferrer"
-                className="grai-page-ca-link"
-                title={protocolAuthority}
-              >
-                <span
-                  className={`grai-page-ca-link-text${protocolAuthorityCopied ? ' is-copied' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  title={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy address'}
-                  aria-label={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy protocol authority address'}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    void copyProtocolAuthority()
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      void copyProtocolAuthority()
-                    }
-                  }}
-                >
-                  {protocolAuthorityCopied ? 'Copied!' : protocolAuthority}
-                </span>
-                <span className="grai-page-ca-link-icon" aria-hidden="true">
-                  {MINT_ASSET_SOLSCAN_ICON}
-                </span>
-              </a>
-            </p>
-          )}
-          {treasuryWallet && (
-            <p className="grai-page-ca grai-manage-protocol-info">
-              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
-                <span className="grai-field-label-icon" aria-hidden="true">
-                  {TREASURY_WALLET_ICON}
-                </span>
-                Treasury wallet:
-              </span>{' '}
-              <a
-                href={solscanAccountUrl(treasuryWallet)}
-                target="_blank"
-                rel="noreferrer"
-                className="grai-page-ca-link"
-                title={treasuryWallet}
-              >
-                <span
-                  className={`grai-page-ca-link-text${treasuryWalletCopied ? ' is-copied' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  title={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy address'}
-                  aria-label={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy treasury wallet address'}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    void copyTreasuryWallet()
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      void copyTreasuryWallet()
-                    }
-                  }}
-                >
-                  {treasuryWalletCopied ? 'Copied!' : treasuryWallet}
-                </span>
-                <span className="grai-page-ca-link-icon" aria-hidden="true">
-                  {MINT_ASSET_SOLSCAN_ICON}
-                </span>
-              </a>
-            </p>
-          )}
-        </div>
-      )}
-      {protocolAuthorityError && (
-        <p className="grai-manage-feedback is-error">{protocolAuthorityError}</p>
-      )}
-
-      <div className="grai-manage-cards">
+        <div className="grai-manage-cards">
         <section className="grai-manage-card grai-manage-action-card" aria-label="Allocate or distribute capital">
           <div className="grai-action-switch" role="tablist" aria-label="Allocate or distribute">
             <button
@@ -1340,39 +1240,7 @@ export function GraiManageSection() {
             }
             footer={
               <div className="grai-mint-split-shares-hint is-open" aria-label="Allocate custody estimate">
-                <div className="grai-burn-assets-section-title">
-                  <span className="grai-burn-assets-section-title-icon" aria-hidden="true">
-                    {ACTION_TX_ICON}
-                  </span>
-                  <span className="grai-burn-assets-section-title-label">TX PREVIEW</span>
-                  <button
-                    type="button"
-                    className={`grai-donut-legend-toggle ${isAllocateAllocationHidden ? 'is-collapsed' : ''}`}
-                    onClick={() => setIsAllocateAllocationHidden((hidden) => !hidden)}
-                    aria-expanded={!isAllocateAllocationHidden}
-                    aria-controls="grai-allocate-allocation"
-                    aria-label={
-                      isAllocateAllocationHidden
-                        ? 'Show allocation estimate'
-                        : 'Hide allocation estimate'
-                    }
-                  >
-                    <svg
-                      className="grai-donut-legend-toggle-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
-                </div>
-                {!isAllocateAllocationHidden && (
-                  <div id="grai-allocate-allocation" className="grai-burn-assets-rows" aria-live="polite">
+                <div id="grai-allocate-allocation" className="grai-burn-assets-rows" aria-live="polite">
                     <div className="grai-burn-assets-row">
                       <span className="grai-burn-assets-amount">
                         <span className="grai-mint-split-vault-prefix">
@@ -1404,8 +1272,7 @@ export function GraiManageSection() {
                         )}
                       </span>
                     </div>
-                  </div>
-                )}
+                </div>
               </div>
             }
           />
@@ -1529,39 +1396,7 @@ export function GraiManageSection() {
             }
             footer={
               <div className="grai-mint-split-shares-hint is-open" aria-label="Distribute yield split estimate">
-                <div className="grai-burn-assets-section-title">
-                  <span className="grai-burn-assets-section-title-icon" aria-hidden="true">
-                    {ACTION_TX_ICON}
-                  </span>
-                  <span className="grai-burn-assets-section-title-label">TX PREVIEW</span>
-                  <button
-                    type="button"
-                    className={`grai-donut-legend-toggle ${isDistributeDistributionHidden ? 'is-collapsed' : ''}`}
-                    onClick={() => setIsDistributeDistributionHidden((hidden) => !hidden)}
-                    aria-expanded={!isDistributeDistributionHidden}
-                    aria-controls="grai-distribute-distribution"
-                    aria-label={
-                      isDistributeDistributionHidden
-                        ? 'Show distribution estimate'
-                        : 'Hide distribution estimate'
-                    }
-                  >
-                    <svg
-                      className="grai-donut-legend-toggle-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
-                </div>
-                {!isDistributeDistributionHidden && (
-                  <div id="grai-distribute-distribution" className="grai-burn-assets-rows">
+                <div id="grai-distribute-distribution" className="grai-burn-assets-rows">
                     {(
                       [
                         {
@@ -1581,7 +1416,7 @@ export function GraiManageSection() {
                       <div className="grai-burn-assets-row" key={row.key}>
                         <span className="grai-burn-assets-amount">
                           <span className="grai-mint-split-vault-prefix">
-                            <span className="grai-mint-split-vault-prefix-icon" aria-hidden="true">
+                            <span className={`grai-mint-split-vault-prefix-icon is-${row.key}`} aria-hidden="true">
                               {row.icon}
                             </span>
                             {row.label}
@@ -1612,8 +1447,7 @@ export function GraiManageSection() {
                         </span>
                       </div>
                     ))}
-                  </div>
-                )}
+                </div>
               </div>
             }
           />
@@ -1652,140 +1486,8 @@ export function GraiManageSection() {
             )}
           </div>
         </section>
-      </div>
-
-      <div className="grai-manage-vaults-row">
-        <section className="grai-manage-junior-vault" aria-label="Junior vault balances">
-          <div className="grai-manage-junior-vault-header">
-            <div className="grai-manage-vault-title-row">
-              <h2 className="grai-manage-junior-vault-title">
-                <span className="grai-manage-junior-vault-title-icon" aria-hidden="true">
-                  {JUNIOR_VAULT_TABLE_ICON}
-                </span>
-                Junior Vault
-              </h2>
-            </div>
-            <span className="grai-manage-junior-vault-nav">
-              NAV: <strong>{totalJuniorNavLabel}</strong>
-            </span>
-          </div>
-          <div className="grai-manage-vault-table-shell">
-            <div className="grai-manage-vault-table-scroll">
-            <div
-              className="grai-balance-table grai-manage-junior-vault-table"
-              id="grai-manage-junior-vault-table"
-              role="table"
-            >
-              <div className="grai-balance-table-row grai-balance-table-row--head" role="row">
-                <div className="grai-balance-table-cell grai-balance-table-cell--head grai-balance-table-cell--asset is-asset" role="columnheader">
-                  <span className="grai-balance-table-col-icon">{ASSET_TABLE_COLUMN_ICON}</span>
-                  Asset
-                </div>
-                <div className="grai-balance-table-cell grai-balance-table-cell--head is-junior" role="columnheader">
-                  <span className="grai-balance-table-col-icon">{JUNIOR_VAULT_TABLE_ICON}</span>
-                  Balance
-                </div>
-                <div className="grai-balance-table-cell grai-balance-table-cell--head is-allocated" role="columnheader">
-                  <span className="grai-balance-table-col-icon">{ALLOCATED_TABLE_ICON}</span>
-                  Allocated
-                </div>
-              </div>
-              <div
-                className={`grai-vault-balance-body-panel${isJuniorVaultTableHidden ? '' : ' is-open'}`}
-                aria-hidden={isJuniorVaultTableHidden}
-              >
-                <div className="grai-vault-balance-body-panel-inner">
-                  <div className="grai-manage-junior-vault-body-grid">
-                    {assetsLoading || vaultBalancesLoading ? (
-                      <div className="grai-balance-table-row" role="row">
-                        <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                          Loading…
-                        </div>
-                        <div className="grai-balance-table-cell grai-balance-table-value" role="cell">—</div>
-                        <div className="grai-balance-table-cell grai-balance-table-value" role="cell">—</div>
-                      </div>
-                    ) : juniorVaultRows.length === 0 ? (
-                      <div className="grai-balance-table-row" role="row">
-                        <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                          No registry assets
-                        </div>
-                        <div className="grai-balance-table-cell grai-balance-table-value" role="cell">—</div>
-                        <div className="grai-balance-table-cell grai-balance-table-value" role="cell">—</div>
-                      </div>
-                    ) : (
-                      juniorVaultRows.map((row) => (
-                        <div className="grai-balance-table-row" role="row" key={row.asset.mint}>
-                          <div className="grai-balance-table-cell grai-balance-table-cell--asset grai-asset-cell" role="cell">
-                            <span className="grai-asset-cell-token">
-                              <span className="grai-asset-cell-icon" aria-hidden="true">
-                                <img src={row.asset.icon.src} alt={row.asset.icon.alt} />
-                              </span>
-                              {row.asset.symbol}
-                            </span>
-                          </div>
-                          <div className="grai-balance-table-cell grai-balance-table-value" role="cell">
-                            <VaultBalanceTableValue
-                              amount={row.idle}
-                              usdRaw={row.idleUsdRaw}
-                              isLoading={vaultBalancesLoading}
-                            />
-                          </div>
-                          <div className="grai-balance-table-cell grai-balance-table-value" role="cell">
-                            <VaultBalanceTableValue
-                              amount={row.allocated}
-                              usdRaw={row.allocatedUsdRaw}
-                              isLoading={vaultBalancesLoading}
-                            />
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
-            <div className="grai-vault-balance-toggle">
-              <button
-                type="button"
-                className={`grai-donut-legend-toggle grai-vault-balance-show-toggle ${isJuniorVaultTableHidden ? 'is-collapsed' : ''}`}
-                onClick={() => setIsJuniorVaultTableHidden((hidden) => !hidden)}
-                aria-expanded={!isJuniorVaultTableHidden}
-                aria-controls="grai-manage-junior-vault-table"
-                aria-label={isJuniorVaultTableHidden ? 'Show junior vault table' : 'Hide junior vault table'}
-              >
-                <svg
-                  className="grai-donut-legend-toggle-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          {vaultBalancesError && (
-            <p className="grai-manage-feedback is-error">{vaultBalancesError}</p>
-          )}
-        </section>
 
         <section className="grai-manage-custody-vault" aria-label="Custody balances">
-          <div className="grai-manage-junior-vault-header">
-            <div className="grai-manage-vault-title-row">
-              <h2 className="grai-manage-junior-vault-title">
-                <span className="grai-manage-junior-vault-title-icon" aria-hidden="true">
-                  {CUSTODY_FIELD_ICON}
-                </span>
-                Custodies
-              </h2>
-            </div>
-            <span className="grai-manage-custody-wallet-link">{KNOWN_GRINDERS.length} grinders</span>
-          </div>
           <div className="grai-manage-vault-table-shell">
             <div className="grai-manage-vault-table-scroll">
             <div
@@ -1800,7 +1502,7 @@ export function GraiManageSection() {
                 </div>
                 <div className="grai-balance-table-cell grai-balance-table-cell--head grai-balance-table-cell--asset is-asset" role="columnheader">
                   <span className="grai-balance-table-col-icon">{ASSET_TABLE_COLUMN_ICON}</span>
-                  Assets
+                  Asset
                 </div>
                 <div className="grai-balance-table-cell grai-balance-table-cell--head is-junior" role="columnheader">
                   <span className="grai-balance-table-col-icon">{JUNIOR_VAULT_TABLE_ICON}</span>
@@ -1975,8 +1677,123 @@ export function GraiManageSection() {
             <p className="grai-manage-feedback is-error">{grinderCustodyError ?? custodyBalancesError}</p>
           )}
         </section>
+        </div>
       </div>
-    </div>
+
+      {(graiMintAddress || protocolAuthority || treasuryWallet) && (
+        <div className="grai-manage-protocol-info-block">
+          {graiMintAddress && (
+            <p className="grai-page-ca grai-manage-protocol-info">
+              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
+                <span className="grai-field-label-icon" aria-hidden="true">
+                  {CONTRACT_ICON}
+                </span>
+                CA:
+              </span>{' '}
+              <a
+                href={solscanTokenUrl(graiMintAddress)}
+                target="_blank"
+                rel="noreferrer"
+                className="grai-page-ca-link"
+                title={graiMintAddress}
+              >
+                <span className="grai-page-ca-link-text">{graiMintAddress}</span>
+                <span className="grai-page-ca-link-icon" aria-hidden="true">
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </span>
+              </a>
+            </p>
+          )}
+          {protocolAuthority && (
+            <p className="grai-page-ca grai-manage-protocol-info">
+              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
+                <span className="grai-field-label-icon" aria-hidden="true">
+                  {PROTOCOL_AUTHORITY_ICON}
+                </span>
+                Protocol authority:
+              </span>{' '}
+              <a
+                href={solscanAccountUrl(protocolAuthority)}
+                target="_blank"
+                rel="noreferrer"
+                className="grai-page-ca-link"
+                title={protocolAuthority}
+              >
+                <span
+                  className={`grai-page-ca-link-text${protocolAuthorityCopied ? ' is-copied' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  title={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy address'}
+                  aria-label={protocolAuthorityCopied ? 'Copied to clipboard' : 'Copy protocol authority address'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void copyProtocolAuthority()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void copyProtocolAuthority()
+                    }
+                  }}
+                >
+                  {protocolAuthorityCopied ? 'Copied!' : protocolAuthority}
+                </span>
+                <span className="grai-page-ca-link-icon" aria-hidden="true">
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </span>
+              </a>
+            </p>
+          )}
+          {treasuryWallet && (
+            <p className="grai-page-ca grai-manage-protocol-info">
+              <span className="grai-page-ca-label grai-page-ca-label--with-icon">
+                <span className="grai-field-label-icon" aria-hidden="true">
+                  {TREASURY_WALLET_ICON}
+                </span>
+                Treasury wallet:
+              </span>{' '}
+              <a
+                href={solscanAccountUrl(treasuryWallet)}
+                target="_blank"
+                rel="noreferrer"
+                className="grai-page-ca-link"
+                title={treasuryWallet}
+              >
+                <span
+                  className={`grai-page-ca-link-text${treasuryWalletCopied ? ' is-copied' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  title={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy address'}
+                  aria-label={treasuryWalletCopied ? 'Copied to clipboard' : 'Copy treasury wallet address'}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    void copyTreasuryWallet()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void copyTreasuryWallet()
+                    }
+                  }}
+                >
+                  {treasuryWalletCopied ? 'Copied!' : treasuryWallet}
+                </span>
+                <span className="grai-page-ca-link-icon" aria-hidden="true">
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </span>
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+      {protocolAuthorityError && (
+        <p className="grai-manage-feedback is-error">{protocolAuthorityError}</p>
+      )}
+    </>
   )
 }
 
