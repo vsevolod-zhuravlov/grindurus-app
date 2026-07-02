@@ -18,6 +18,8 @@ services:
     restart: unless-stopped
     # node_modules volume replaces image deps; install linux binaries (esbuild, etc.) here
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3001"
+    environment:
+      - BOSS_API_TARGET=${BOSS_API_TARGET:-http://boss-backend-dev:8000}
     networks:
       - grindurus
     ports:

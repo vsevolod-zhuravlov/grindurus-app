@@ -65,6 +65,13 @@ export function getDefaultGraiSolanaCluster(): SolanaCluster {
   return 'devnet'
 }
 
+function devnetRpcProxyUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/solana-devnet-rpc`
+  }
+  return 'http://localhost:3001/solana-devnet-rpc'
+}
+
 function resolveSolanaRpcUrlInternal(cluster: SolanaCluster): string {
   const suffix = clusterEnvSuffix(cluster)
   const graiSpecific = readEnv(`VITE_GRAI_${suffix}_RPC_URL`)
@@ -81,6 +88,11 @@ function resolveSolanaRpcUrlInternal(cluster: SolanaCluster): string {
 
   const solanaRpc = readEnv('VITE_SOLANA_RPC_URL')
   if (solanaRpc && detectClusterFromRpc(solanaRpc) === cluster) return solanaRpc
+
+  // Local dev: proxy to official devnet RPC (api.devnet.solana.com TLS cert is expired).
+  if (import.meta.env.DEV && cluster === 'devnet') {
+    return devnetRpcProxyUrl()
+  }
 
   return clusterApiUrl(cluster)
 }

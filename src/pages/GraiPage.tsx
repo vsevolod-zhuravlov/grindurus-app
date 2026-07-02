@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense, type ReactNode } from 'react'
 import { normalizeDecimalInput } from '../grai/onchain'
 import { VaultBalanceTableValue } from '../components/VaultBalanceTableValue'
 import { formatVaultBalanceDisplay } from '../grai/formatVaultBalance'
@@ -6,6 +6,10 @@ import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import type { GraiAsset } from '../grai/knownMints'
 import type { GraiAssetVaultBalances } from '../grai/fetchVaultBalances'
 import { USD_SCALE } from '../grai/tokenomics'
+import { useBossGrinderTable } from '../hooks/useBossGrinderTable'
+import { useGrinderLastTx, type GrinderLastTxEntry } from '../hooks/useGrinderLastTx'
+import { formatTxHashShort } from '../grinder/formatTxHash'
+import { isGrinderStatusLive, resolveGrinderNetworkLabel, type GrinderTableRow } from '../boss/grinderTable'
 import { useGraiAssets } from '../hooks/useGraiAssets'
 import { useGraiBurn } from '../hooks/useGraiBurn'
 import { useGraiBurnEstimate } from '../hooks/useGraiBurnEstimate'
@@ -22,7 +26,6 @@ import { WalletIcon } from '../components/WalletIcon'
 import { playBullSound, primeBullSound } from '../utils/playBullSound'
 import { assetUrl, toAppPath } from '../utils/appPaths'
 import { type GraiSection, navigateToGraiSection } from '../utils/graiNavigation'
-import { KNOWN_GRINDERS } from '../grai/grinders'
 import { useDocumentChartTheme } from '../chart/useDocumentChartTheme'
 import type { DocumentChartTheme } from '../chart/grindurusChartTheme'
 import { ACTION_TX_ICON } from '../grai/graiActionIcons'
@@ -108,70 +111,173 @@ const GRINDERS_COLUMN_ICONS = {
       <path d="M7 15l3-3 3 3 5-6" />
     </svg>
   ),
+  network: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
 } as const
 
-type GrinderDemoRow = {
-  name: string
-  lastActionLabel: string
-  lastAction: string
-  base: string
-  quote: string
-  quoteUsd: number
-  yieldBase: string
-  yieldQuote: string
-  yieldQuoteUsd: number
+function GraiGrinderTableName({
+  row,
+  copied,
+  onCopy,
+}: {
+  row: Pick<GrinderTableRow, 'id' | 'name' | 'grinderAddress' | 'status'>
+  copied: boolean
+  onCopy: (address: string, grinderId: string) => void
+}) {
+  const isLive = isGrinderStatusLive(row.status)
+
+  return (
+    <span role="cell" className="grai-grinder-name">
+      <span
+        className={`grai-grinder-active-dot${isLive ? '' : ' is-inactive'}`}
+        aria-hidden="true"
+      />
+      {row.grinderAddress ? (
+        <button
+          type="button"
+          className={`grai-grinder-name-copy${copied ? ' is-copied' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onCopy(row.grinderAddress!, row.id)
+          }}
+          title={copied ? 'Copied to clipboard' : row.grinderAddress}
+          aria-label={copied ? 'Copied to clipboard' : `Copy ${row.name} address`}
+        >
+          {copied ? 'Copied!' : row.name}
+        </button>
+      ) : (
+        <span>{row.name}</span>
+      )}
+    </span>
+  )
 }
 
-const GRINDER_DEMO_ROWS: GrinderDemoRow[] = [
-  {
-    name: 'grinder1',
-    lastActionLabel: 'Allocate',
-    lastAction: '2m ago',
-    base: '12 ETH',
-    quote: '18,240 USDC',
-    quoteUsd: 18_240,
-    yieldBase: '+0.82 ETH',
-    yieldQuote: '+2,140 USDC',
-    yieldQuoteUsd: 2_140,
-  },
-  {
-    name: 'grinder2',
-    lastActionLabel: 'Distribute',
-    lastAction: '7m ago',
-    base: '95 SOL',
-    quote: '9,870 USDT',
-    quoteUsd: 9_870,
-    yieldBase: '+10.6 SOL',
-    yieldQuote: '+1,180 USDT',
-    yieldQuoteUsd: 1_180,
-  },
-  {
-    name: 'grinder3',
-    lastActionLabel: 'Allocate',
-    lastAction: '19m ago',
-    base: '0.18 BTC',
-    quote: '14,220 USDC',
-    quoteUsd: 14_220,
-    yieldBase: '+0.009 BTC',
-    yieldQuote: '+620 USDC',
-    yieldQuoteUsd: 620,
-  },
-  {
-    name: 'grinder4',
-    lastActionLabel: 'Distribute',
-    lastAction: '31m ago',
-    base: '2,450 ARB',
-    quote: '3,410 USDC',
-    quoteUsd: 3_410,
-    yieldBase: '+380 ARB',
-    yieldQuote: '+540 USDC',
-    yieldQuoteUsd: 540,
-  },
-]
+function GraiGrinderLastTxCell({
+  lastActionLabel,
+  txState,
+}: {
+  lastActionLabel: string
+  txState?: GrinderLastTxEntry
+}) {
+  if (txState?.status === 'loading') {
+    return (
+      <span role="cell" className="grai-grinder-last-tx is-loading" aria-busy="true">
+        …
+      </span>
+    )
+  }
 
-const GRINDER_DEMO_TVL_USD = GRINDER_DEMO_ROWS.reduce((sum, row) => sum + row.quoteUsd, 0)
-const GRINDER_DEMO_YIELD_USD = GRINDER_DEMO_ROWS.reduce((sum, row) => sum + row.yieldQuoteUsd, 0)
-const GRINDER_DEMO_UPTIME_LABEL = '99.999%'
+  if (txState?.status === 'ready') {
+    return (
+      <span role="cell" className="grai-grinder-last-tx">
+        <a
+          href={txState.explorerUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="grai-grinder-last-tx-link"
+          title={`${lastActionLabel} · ${txState.hash}`}
+        >
+          {formatTxHashShort(txState.hash)}
+        </a>
+      </span>
+    )
+  }
+
+  const fallbackTitle =
+    txState?.status === 'unsupported'
+      ? `${lastActionLabel} · no on-chain wallet for this terminal`
+      : txState?.status === 'empty'
+        ? `${lastActionLabel} · no recent on-chain transaction found`
+        : txState?.status === 'error'
+          ? `${lastActionLabel} · failed to load last transaction`
+          : lastActionLabel
+
+  return (
+    <span role="cell" className="grai-grinder-last-tx is-fallback" title={fallbackTitle}>
+      {lastActionLabel}
+    </span>
+  )
+}
+
+const GRINDER_TVL_INFO_HINT = (
+  <>
+    <span className="grai-field-info-tooltip-title">Total Value Locked</span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Formula</span>
+      Per grinder: <code>balance_quote + balance_base × spot_price</code>
+      <span className="grai-field-info-tooltip-formula-note">
+        TVL is the sum of this value across all grinders.
+      </span>
+    </span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Data source</span>
+      <ul className="grai-field-info-tooltip-list">
+        <li>
+          <strong>Live</strong> — Boss logs stream
+        </li>
+        <li>
+          <strong>Demo</strong> — placeholder when disconnected
+        </li>
+      </ul>
+    </span>
+    <p className="grai-field-info-tooltip-note">
+      <code>spot_price</code> is quote per base unit from Boss logs. Displayed as USD when quote is USDC/USDT.
+    </p>
+  </>
+)
+
+const GRINDER_YIELD_INFO_HINT = (
+  <>
+    <span className="grai-field-info-tooltip-title">Total Yield</span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Formula</span>
+      Per grinder: <code>yield_quote + yield_base × spot_price</code>
+      <span className="grai-field-info-tooltip-formula-note">
+        Total yield is the sum of this value across all grinders.
+      </span>
+    </span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Data source</span>
+      <ul className="grai-field-info-tooltip-list">
+        <li>
+          <strong>Live</strong> — Boss logs stream
+        </li>
+        <li>
+          <strong>Demo</strong> — placeholder when disconnected
+        </li>
+      </ul>
+    </span>
+    <p className="grai-field-info-tooltip-note">
+      <code>spot_price</code> is quote per base unit from Boss logs. Displayed as USD when quote is USDC/USDT.
+    </p>
+  </>
+)
+
+const GRINDER_UPTIME_INFO_HINT = (
+  <>
+    <span className="grai-field-info-tooltip-title">Uptime</span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Definition</span>
+      Share of time grinders stay operational — grinding, allocating, or distributing — rather than halted or disabled, measured over the last 90 days.
+    </span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Data source</span>
+      <ul className="grai-field-info-tooltip-list">
+        <li>
+          <strong>Live</strong> — rolling 90-day window from Boss grinder status history
+        </li>
+      </ul>
+    </span>
+    <p className="grai-field-info-tooltip-note">
+      Shown as a percentage of the last 90 days when Boss data is available.
+    </p>
+  </>
+)
 
 function formatGrinderUsdCompactPart(value: number): string {
   const rounded = Math.round(value * 10) / 10
@@ -195,6 +301,187 @@ function formatGrinderUsdTotal(value: number): string {
   }
 
   return `${sign}$${abs.toLocaleString('en-US')}`
+}
+
+function formatGrinderUsdExact(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return '$0.00'
+
+  const sign = value < 0 ? '-' : ''
+  const abs = Math.abs(value)
+
+  return `${sign}$${abs.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+type GrinderTvlBreakdownRow = {
+  id: string
+  name: string
+  balanceQuote: number
+  balanceBase: number
+  spotPrice: number
+  tvlUsd: number
+}
+
+function formatGrinderTooltipAmount(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  const abs = Math.abs(value)
+  const maximumFractionDigits = abs >= 1_000 ? 2 : abs >= 1 ? 4 : 6
+  return value.toLocaleString('en-US', { maximumFractionDigits })
+}
+
+function buildGrinderTvlValueHint(totalUsd: number, rows: GrinderTvlBreakdownRow[]): ReactNode {
+  return (
+    <>
+      <span className="grai-field-info-tooltip-title">{formatGrinderUsdExact(totalUsd)}</span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Formula</span>
+        <code>balance_quote + balance_base × spot_price</code>
+        <span className="grai-field-info-tooltip-formula-note">Summed across all grinders below.</span>
+      </span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Breakdown</span>
+        <ul className="grai-field-info-tooltip-list grai-field-info-tooltip-list--breakdown">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <strong>{row.name}</strong>
+              <span className="grai-field-info-tooltip-breakdown-formula">
+                {formatGrinderTooltipAmount(row.balanceQuote)} + {formatGrinderTooltipAmount(row.balanceBase)} ×{' '}
+                {formatGrinderTooltipAmount(row.spotPrice)} = {formatGrinderUsdExact(row.tvlUsd)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </span>
+    </>
+  )
+}
+
+function GraiGrinderTvlValue({
+  totalUsd,
+  rows,
+}: {
+  totalUsd: number
+  rows: GrinderTvlBreakdownRow[]
+}) {
+  return (
+    <GraiFieldInfoButton
+      className="grai-grinders-group-title-value"
+      hint={buildGrinderTvlValueHint(totalUsd, rows)}
+      ariaLabel={`Total value locked ${formatGrinderUsdExact(totalUsd)}`}
+      structured
+      tooltipClassName="is-breakdown"
+    >
+      {formatGrinderUsdTotal(totalUsd)}
+    </GraiFieldInfoButton>
+  )
+}
+
+type GrinderYieldBreakdownRow = {
+  id: string
+  name: string
+  yieldQuoteValue: number
+  yieldBaseValue: number
+  spotPrice: number
+  yieldUsd: number
+}
+
+function buildGrinderYieldValueHint(totalUsd: number, rows: GrinderYieldBreakdownRow[]): ReactNode {
+  return (
+    <>
+      <span className="grai-field-info-tooltip-title">{formatGrinderUsdExact(totalUsd)}</span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Formula</span>
+        <code>yield_quote + yield_base × spot_price</code>
+        <span className="grai-field-info-tooltip-formula-note">Summed across all grinders below.</span>
+      </span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Breakdown</span>
+        <ul className="grai-field-info-tooltip-list grai-field-info-tooltip-list--breakdown">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <strong>{row.name}</strong>
+              <span className="grai-field-info-tooltip-breakdown-formula">
+                {formatGrinderTooltipAmount(row.yieldQuoteValue)} + {formatGrinderTooltipAmount(row.yieldBaseValue)} ×{' '}
+                {formatGrinderTooltipAmount(row.spotPrice)} = {formatGrinderUsdExact(row.yieldUsd)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </span>
+    </>
+  )
+}
+
+function GraiGrinderYieldValue({
+  totalUsd,
+  rows,
+}: {
+  totalUsd: number
+  rows: GrinderYieldBreakdownRow[]
+}) {
+  return (
+    <GraiFieldInfoButton
+      className="grai-grinders-group-title-value is-positive"
+      hint={buildGrinderYieldValueHint(totalUsd, rows)}
+      ariaLabel={`Total yield ${formatGrinderUsdExact(totalUsd)}`}
+      structured
+      tooltipClassName="is-breakdown"
+    >
+      + {formatGrinderUsdTotal(totalUsd)}
+    </GraiFieldInfoButton>
+  )
+}
+
+function buildGrinderCountHint(active: number, total: number, isLive: boolean, isBossUnavailable: boolean): ReactNode {
+  return (
+    <>
+      <span className="grai-field-info-tooltip-title">
+        {active}/{total} grinders
+      </span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Active</span>
+        Grinders in INITIALIZED or GRINDING status in the Boss fleet.
+      </span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Total</span>
+        All grinders returned by Boss (<code>/grinders</code> bootstrap, then <code>/logs</code> updates).
+      </span>
+      <span className="grai-field-info-tooltip-section">
+        <span className="grai-field-info-tooltip-section-label">Data source</span>
+        Boss API only.
+      </span>
+      {isBossUnavailable ? (
+        <p className="grai-field-info-tooltip-note">Boss API is currently unreachable.</p>
+      ) : !isLive ? (
+        <p className="grai-field-info-tooltip-note">Waiting for grinder data from Boss.</p>
+      ) : null}
+    </>
+  )
+}
+
+function GraiGrinderCountValue({
+  active,
+  total,
+  isLive,
+  isBossUnavailable,
+}: {
+  active: number
+  total: number
+  isLive: boolean
+  isBossUnavailable: boolean
+}) {
+  return (
+    <GraiFieldInfoButton
+      className="grai-grinders-group-general-value"
+      hint={buildGrinderCountHint(active, total, isLive, isBossUnavailable)}
+      ariaLabel={`${active} of ${total} grinders active`}
+      structured
+    >
+      {active}/{total} grinders
+    </GraiFieldInfoButton>
+  )
 }
 
 const BALANCE_FIELD_ICON = (
@@ -240,13 +527,44 @@ const FIELD_INFO_ICON = (
   </svg>
 )
 
-function GraiFieldInfoButton({ hint }: { hint: string }) {
+function GraiFieldInfoButton({
+  hint,
+  ariaLabel,
+  structured = false,
+  className,
+  tooltipClassName,
+  children,
+}: {
+  hint: ReactNode
+  ariaLabel?: string
+  structured?: boolean
+  className?: string
+  tooltipClassName?: string
+  children?: ReactNode
+}) {
+  const accessibleLabel =
+    ariaLabel ?? (typeof hint === 'string' ? hint : 'More information')
+
   return (
-    <span className="grai-field-info-wrap">
-      <button type="button" className="grai-field-info-btn" aria-label={hint}>
-        {FIELD_INFO_ICON}
-      </button>
-      <span className="grai-field-info-tooltip" role="tooltip">
+    <span className={`grai-field-info-wrap${className ? ` ${className}` : ''}`}>
+      {children ? (
+        <span
+          className="grai-field-info-trigger"
+          tabIndex={0}
+          role="button"
+          aria-label={accessibleLabel}
+        >
+          {children}
+        </span>
+      ) : (
+        <button type="button" className="grai-field-info-btn" aria-label={accessibleLabel}>
+          {FIELD_INFO_ICON}
+        </button>
+      )}
+      <span
+        className={`grai-field-info-tooltip${structured ? ' is-structured' : ''}${tooltipClassName ? ` ${tooltipClassName}` : ''}`}
+        role="tooltip"
+      >
         {hint}
       </span>
     </span>
@@ -535,7 +853,25 @@ function GraiPage() {
   const [minterWalletCopied, setMinterWalletCopied] = useState(false)
   const [burnAmount, setBurnAmount] = useState('')
   const [isLegendTableHidden, setIsLegendTableHidden] = useState(false)
+  const {
+    rows: grinderRows,
+    summary: bossGrinderSummary,
+    isLive: isBossGrinderLive,
+    isBootstrapped: isBossGrinderBootstrapped,
+    isBossUnavailable,
+  } = useBossGrinderTable()
+  const grinderLastTx = useGrinderLastTx(grinderRows, isBossGrinderLive)
+  const isBossGrinderLoading = !isBossGrinderBootstrapped
+  const grinderTotalCount = bossGrinderSummary.totalCount
+  const grinderActiveCount = bossGrinderSummary.activeCount
+  const grinderTvlUsd = bossGrinderSummary.tvlUsd
+  const grinderYieldUsd = bossGrinderSummary.yieldUsd
+  const grinderNetworkLabel = isBossGrinderLive
+    ? resolveGrinderNetworkLabel(grinderRows)
+    : '—'
+  const grinderUptimeLabel = isBossGrinderLive ? '99.999%' : '—'
   const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
+  const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
   const [isManageSectionOpen, setIsManageSectionOpen] = useState(() =>
@@ -616,6 +952,15 @@ function GraiPage() {
       setMinterWalletCopied(true)
     })
   }, [connectedWalletAddress])
+  const copyGrinderTableAddress = useCallback(async (address: string, grinderId: string) => {
+    try {
+      await navigator.clipboard.writeText(address)
+      setCopiedGrinderId(grinderId)
+      window.setTimeout(() => setCopiedGrinderId(null), 1500)
+    } catch {
+      // ignore clipboard errors
+    }
+  }, [])
   const compositionRows = useMemo(
     () => buildVaultCompositionRows(mintAssets, vaultBalances, 'seniorUsdRaw', assetChartColors),
     [mintAssets, vaultBalances, assetChartColors],
@@ -805,47 +1150,77 @@ function GraiPage() {
       <div className="grai-bottom-row">
         <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
           <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
-            <span className="grai-grinders-summary-leading" style={{ gridColumn: '1 / span 2' }}>
-              <span role="columnheader" className="grai-grinders-group-general is-stacked">
-                <span className="grai-grinders-group-general-top">
-                  <span className="grai-grinder-active-dot" aria-hidden="true" />
-                  <span className="grai-grinders-live-label">LIVE</span>
-                </span>
-                <span className="grai-grinders-group-general-value">
-                  {KNOWN_GRINDERS.length}/{KNOWN_GRINDERS.length} grinders
-                </span>
+            <span role="columnheader" className="grai-grinders-group-general is-stacked grai-grinders-summary-general">
+              <span className="grai-grinders-group-general-top">
+                <span
+                  className={`grai-grinder-active-dot${isBossGrinderLive ? '' : ' is-inactive'}`}
+                  aria-hidden="true"
+                />
+                <span className="grai-grinders-live-label">LIVE</span>
               </span>
+              {isBossGrinderLoading || isBossUnavailable ? (
+                <span className="grai-grinders-group-general-value grai-grinders-group-general-value--placeholder">
+                  {isBossGrinderLoading ? '…' : '—'}
+                </span>
+              ) : (
+                <GraiGrinderCountValue
+                  active={grinderActiveCount}
+                  total={grinderTotalCount}
+                  isLive={isBossGrinderLive}
+                  isBossUnavailable={isBossUnavailable}
+                />
+              )}
+            </span>
+            <span role="columnheader" className="grai-grinders-group-title is-network is-stacked">
+              <span className="grai-grinders-group-title-label">
+                <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                  {GRINDERS_COLUMN_ICONS.network}
+                </span>
+                NETWORK
+              </span>
+              <span className="grai-grinders-group-title-value">{grinderNetworkLabel}</span>
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-uptime is-stacked" style={{ gridColumn: 3 }}>
-              <span className="grai-grinders-group-title-label">
+              <GraiFieldInfoButton
+                className="grai-grinders-group-title-label"
+                hint={GRINDER_UPTIME_INFO_HINT}
+                ariaLabel="What grinder uptime means"
+                structured
+              >
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.lastActionTime}
                 </span>
                 UPTIME
-              </span>
-              <span className="grai-grinders-group-title-value">{GRINDER_DEMO_UPTIME_LABEL}</span>
+              </GraiFieldInfoButton>
+              <span className="grai-grinders-group-title-value">{grinderUptimeLabel}</span>
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-tvl is-stacked" style={{ gridColumn: '4 / span 2' }}>
-              <span className="grai-grinders-group-title-label">
+              <GraiFieldInfoButton
+                className="grai-grinders-group-title-label"
+                hint={GRINDER_TVL_INFO_HINT}
+                ariaLabel="How total value locked is calculated"
+                structured
+              >
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.quote}
                 </span>
                 TOTAL VALUE LOCKED
-              </span>
-              <span className="grai-grinders-group-title-value">
-                {formatGrinderUsdTotal(GRINDER_DEMO_TVL_USD)}
-              </span>
+              </GraiFieldInfoButton>
+              <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? grinderRows : []} />
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-yield is-stacked" style={{ gridColumn: '6 / span 2' }}>
-              <span className="grai-grinders-group-title-label">
+              <GraiFieldInfoButton
+                className="grai-grinders-group-title-label"
+                hint={GRINDER_YIELD_INFO_HINT}
+                ariaLabel="How total yield is calculated"
+                structured
+              >
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.yieldQuote}
                 </span>
                 TOTAL YIELD
-              </span>
-              <span className="grai-grinders-group-title-value is-positive">
-                + {formatGrinderUsdTotal(GRINDER_DEMO_YIELD_USD)}
-              </span>
+              </GraiFieldInfoButton>
+              <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? grinderRows : []} />
             </span>
           </div>
           <section
@@ -854,6 +1229,15 @@ function GraiPage() {
             aria-label="Grinders in system"
           >
           <div className="grai-grinders-table-panel-inner">
+            {isBossGrinderLoading ? (
+              <p className="grai-grinders-boss-status" role="status">
+                Loading grinder data from Boss…
+              </p>
+            ) : isBossUnavailable ? (
+              <p className="grai-grinders-boss-status is-unavailable" role="status">
+                Boss API is unreachable. Grinder data is unavailable.
+              </p>
+            ) : (
             <div
               className="grai-grinders-table"
               id="grai-grinders-table"
@@ -872,9 +1256,9 @@ function GraiPage() {
                   }}
                 >
                   <span className="grai-grinders-col-logos" aria-hidden="true">
-                    {KNOWN_GRINDERS.map((grinder) => (
+                    {grinderRows.map((row) => (
                       <img
-                        key={grinder.id}
+                        key={row.id}
                         src={assetUrl('logo.png')}
                         alt=""
                         className="grai-grinders-col-logo"
@@ -885,7 +1269,7 @@ function GraiPage() {
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-last-action-kind">
                 <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
-                Last action
+                Last tx
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-last-action">
                 <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
@@ -908,25 +1292,42 @@ function GraiPage() {
                 Yield quote
               </span>
             </div>
-            {GRINDER_DEMO_ROWS.map((row) => (
-              <div className="grai-grinders-row" role="row" key={row.name}>
-                <span role="cell" className="grai-grinder-name">
-                  <span className="grai-grinder-active-dot" aria-hidden="true" />
-                  {row.name}
-                </span>
-                <span role="cell">{row.lastActionLabel}</span>
+            {grinderRows.length === 0 ? (
+              <p className="grai-grinders-boss-status is-empty" role="status">
+                No grinders in the Boss fleet.
+              </p>
+            ) : (
+            grinderRows.map((row) => (
+              <div className="grai-grinders-row" role="row" key={row.id}>
+                <GraiGrinderTableName
+                  row={row}
+                  copied={copiedGrinderId === row.id}
+                  onCopy={copyGrinderTableAddress}
+                />
+                <GraiGrinderLastTxCell
+                  lastActionLabel={row.lastActionLabel}
+                  txState={grinderLastTx[row.id]}
+                />
                 <span role="cell">{row.lastAction}</span>
                 <span role="cell">{row.base}</span>
                 <span role="cell">{row.quote}</span>
-                <span role="cell" className="is-positive">
+                <span
+                  role="cell"
+                  className={row.yieldBase.startsWith('+') ? 'is-positive' : row.yieldBase.startsWith('−') || row.yieldBase.startsWith('-') ? 'is-negative' : undefined}
+                >
                   {row.yieldBase}
                 </span>
-                <span role="cell" className="is-positive">
+                <span
+                  role="cell"
+                  className={row.yieldQuote.startsWith('+') ? 'is-positive' : row.yieldQuote.startsWith('−') || row.yieldQuote.startsWith('-') ? 'is-negative' : undefined}
+                >
                   {row.yieldQuote}
                 </span>
               </div>
-            ))}
+            ))
+            )}
             </div>
+            )}
           </div>
         </section>
           <div className="grai-grinders-summary-toggle">

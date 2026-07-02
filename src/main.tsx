@@ -3,6 +3,7 @@ import App from './App'
 import { AppWalletProvider } from './providers/AppWalletProvider'
 import { GraiDeploymentProvider } from './grai/GraiDeploymentProvider'
 import { GraiDataProvider } from './providers/GraiDataProvider'
+import './boss/bossLogsStream'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
