@@ -15,6 +15,7 @@ export type GrinderTableRow = {
   isActive: boolean
   lastActionLabel: string
   lastAction: string
+  lastTxHash?: string
   base: string
   quote: string
   balanceQuote: number
@@ -27,6 +28,7 @@ export type GrinderTableRow = {
   yieldBaseValue: number
   yieldUsd: number
   terminal?: string
+  network?: string
 }
 
 export type GrinderTableSummary = {
@@ -184,6 +186,7 @@ export function mapBossLogToGrinderRow(
     isActive: isActiveLog(log),
     lastActionLabel: lastActionLabelFromLog(log),
     lastAction: formatRelativeTime(log.time),
+    lastTxHash: log.last_tx_hash?.trim() || undefined,
     base: formatTokenAmount(balanceBase, baseAsset),
     quote: formatTokenAmount(balanceQuote, quoteAsset),
     balanceQuote: balanceQuote ?? 0,
@@ -196,6 +199,7 @@ export function mapBossLogToGrinderRow(
     yieldBaseValue: pnlBase ?? 0,
     yieldUsd: computeGrinderYieldUsd(pnlQuote, pnlBase, spotPrice),
     terminal: log.terminal?.trim() || undefined,
+    network: log.network?.trim() || undefined,
   }
 }
 

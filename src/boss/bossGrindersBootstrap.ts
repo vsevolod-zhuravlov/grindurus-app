@@ -29,7 +29,11 @@ type BossGrinderRecord = BossGrinderLogPayload & {
     base_asset?: string
     quote_asset?: string
     spot_price?: number
+    network?: string
+    last_tx_hash?: string
   }
+  last_tx_hash?: string
+  network?: string
 }
 
 function readNumber(value: unknown): number | undefined {
@@ -139,6 +143,18 @@ function recordToLogPayload(bossId: string, record: BossGrinderRecord): BossGrin
     alloc_base: readRecordNumber(record, 'alloc_base', record.allocated, 'base'),
     spot_price: record.spot_price ?? record.adapter_data?.spot_price,
     terminal: typeof record.terminal === 'string' ? record.terminal : undefined,
+    network:
+      typeof record.network === 'string'
+        ? record.network
+        : typeof record.adapter_data?.network === 'string'
+          ? record.adapter_data.network
+          : undefined,
+    last_tx_hash:
+      typeof record.last_tx_hash === 'string'
+        ? record.last_tx_hash
+        : typeof record.adapter_data?.last_tx_hash === 'string'
+          ? record.adapter_data.last_tx_hash
+          : undefined,
     ...(error ? { error } : {}),
   }
 }

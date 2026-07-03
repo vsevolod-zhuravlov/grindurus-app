@@ -9,7 +9,7 @@ import { USD_SCALE } from '../grai/tokenomics'
 import { useBossGrinderTable } from '../hooks/useBossGrinderTable'
 import { useGrinderLastTx, type GrinderLastTxEntry } from '../hooks/useGrinderLastTx'
 import { formatTxHashShort } from '../grinder/formatTxHash'
-import { isGrinderStatusLive, resolveGrinderNetworkLabel, type GrinderTableRow } from '../boss/grinderTable'
+import { isGrinderStatusLive, type GrinderTableRow } from '../boss/grinderTable'
 import { useGraiAssets } from '../hooks/useGraiAssets'
 import { useGraiBurn } from '../hooks/useGraiBurn'
 import { useGraiBurnEstimate } from '../hooks/useGraiBurnEstimate'
@@ -21,6 +21,9 @@ import { useWalletAssetBalance } from '../hooks/useWalletAssetBalance'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { FloatingTokenBackground, STABLE_FLOATING_TOKENS } from '../components/FloatingTokenBackground'
 import { GraiNavDonut } from '../components/GraiNavDonut'
+import { BossEndpointsTable } from '../components/BossEndpointsTable'
+import { WalletNetworkSelect } from '../components/WalletNetworkSelect'
+import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useWalletContext } from '../providers/AppWalletProvider'
 import { WalletIcon } from '../components/WalletIcon'
 import { playBullSound, primeBullSound } from '../utils/playBullSound'
@@ -164,14 +167,6 @@ function GraiGrinderLastTxCell({
   lastActionLabel: string
   txState?: GrinderLastTxEntry
 }) {
-  if (txState?.status === 'loading') {
-    return (
-      <span role="cell" className="grai-grinder-last-tx is-loading" aria-busy="true">
-        …
-      </span>
-    )
-  }
-
   if (txState?.status === 'ready') {
     return (
       <span role="cell" className="grai-grinder-last-tx">
@@ -188,30 +183,38 @@ function GraiGrinderLastTxCell({
     )
   }
 
+  if (txState?.status === 'hashOnly') {
+    return (
+      <span role="cell" className="grai-grinder-last-tx" title={`${lastActionLabel} · ${txState.hash}`}>
+        {formatTxHashShort(txState.hash)}
+      </span>
+    )
+  }
+
   const fallbackTitle =
-    txState?.status === 'unsupported'
-      ? `${lastActionLabel} · no on-chain wallet for this terminal`
-      : txState?.status === 'empty'
-        ? `${lastActionLabel} · no recent on-chain transaction found`
-        : txState?.status === 'error'
-          ? `${lastActionLabel} · failed to load last transaction`
-          : lastActionLabel
+    txState?.status === 'empty'
+      ? `${lastActionLabel} · no last transaction from Boss logs`
+      : 'No last transaction'
 
   return (
-    <span role="cell" className="grai-grinder-last-tx is-fallback" title={fallbackTitle}>
-      {lastActionLabel}
+    <span
+      role="cell"
+      className="grai-grinder-last-tx is-fallback is-placeholder"
+      title={fallbackTitle}
+    >
+      —
     </span>
   )
 }
 
 const GRINDER_TVL_INFO_HINT = (
   <>
-    <span className="grai-field-info-tooltip-title">Total Value Locked</span>
+    <span className="grai-field-info-tooltip-title">Value Locked</span>
     <span className="grai-field-info-tooltip-section">
       <span className="grai-field-info-tooltip-section-label">Formula</span>
       Per grinder: <code>balance_quote + balance_base × spot_price</code>
       <span className="grai-field-info-tooltip-formula-note">
-        TVL is the sum of this value across all grinders.
+        Value locked is the sum of this value across all grinders.
       </span>
     </span>
     <span className="grai-field-info-tooltip-section">
@@ -233,12 +236,12 @@ const GRINDER_TVL_INFO_HINT = (
 
 const GRINDER_YIELD_INFO_HINT = (
   <>
-    <span className="grai-field-info-tooltip-title">Total Yield</span>
+    <span className="grai-field-info-tooltip-title">Yield</span>
     <span className="grai-field-info-tooltip-section">
       <span className="grai-field-info-tooltip-section-label">Formula</span>
       Per grinder: <code>yield_quote + yield_base × spot_price</code>
       <span className="grai-field-info-tooltip-formula-note">
-        Total yield is the sum of this value across all grinders.
+        Yield is the sum of this value across all grinders.
       </span>
     </span>
     <span className="grai-field-info-tooltip-section">
@@ -255,6 +258,20 @@ const GRINDER_YIELD_INFO_HINT = (
     <p className="grai-field-info-tooltip-note">
       <code>spot_price</code> is quote per base unit from Boss logs. Displayed as USD when quote is USDC/USDT.
     </p>
+  </>
+)
+
+const GRINDER_NETWORK_INFO_HINT = (
+  <>
+    <span className="grai-field-info-tooltip-title">Network</span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Definition</span>
+      The chain your connected wallet is on — EVM (Ethereum, Arbitrum, Base, …) or Solana (Mainnet / Devnet).
+    </span>
+    <span className="grai-field-info-tooltip-section">
+      <span className="grai-field-info-tooltip-section-label">Selection</span>
+      Use the dropdown to switch networks when a wallet is connected, or Connect Wallet to pick a chain first.
+    </span>
   </>
 )
 
@@ -369,7 +386,7 @@ function GraiGrinderTvlValue({
     <GraiFieldInfoButton
       className="grai-grinders-group-title-value"
       hint={buildGrinderTvlValueHint(totalUsd, rows)}
-      ariaLabel={`Total value locked ${formatGrinderUsdExact(totalUsd)}`}
+      ariaLabel={`Value locked ${formatGrinderUsdExact(totalUsd)}`}
       structured
       tooltipClassName="is-breakdown"
     >
@@ -425,7 +442,7 @@ function GraiGrinderYieldValue({
     <GraiFieldInfoButton
       className="grai-grinders-group-title-value is-positive"
       hint={buildGrinderYieldValueHint(totalUsd, rows)}
-      ariaLabel={`Total yield ${formatGrinderUsdExact(totalUsd)}`}
+      ariaLabel={`Yield ${formatGrinderUsdExact(totalUsd)}`}
       structured
       tooltipClassName="is-breakdown"
     >
@@ -479,7 +496,7 @@ function GraiGrinderCountValue({
       ariaLabel={`${active} of ${total} grinders active`}
       structured
     >
-      {active}/{total} grinders
+      {active}/{total} GRINDERS
     </GraiFieldInfoButton>
   )
 }
@@ -830,6 +847,7 @@ function GraiEstimateSuffix({ solscanHref }: { solscanHref?: string | null }) {
 
 function GraiPage() {
   const { openChainSelector } = useWalletContext()
+  const activeWallet = useActiveWallet()
   const chartTheme = useDocumentChartTheme()
   const assetChartColors = useMemo(() => getAssetChartColors(chartTheme), [chartTheme])
   const { solana, staticSolana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl, clusterMismatch, solanaCluster, hasStaticConfig, protocolError } = useGraiDeployment()
@@ -866,21 +884,45 @@ function GraiPage() {
   const grinderActiveCount = bossGrinderSummary.activeCount
   const grinderTvlUsd = bossGrinderSummary.tvlUsd
   const grinderYieldUsd = bossGrinderSummary.yieldUsd
-  const grinderNetworkLabel = isBossGrinderLive
-    ? resolveGrinderNetworkLabel(grinderRows)
-    : '—'
+  const isGrinderNetworkConnected = activeWallet.isConnected && Boolean(activeWallet.networkName)
   const grinderUptimeLabel = isBossGrinderLive ? '99.999%' : '—'
   const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
   const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
+  const [isBossEndpointsOpen, setIsBossEndpointsOpen] = useState(false)
+  const [isTokenFlowMounted, setIsTokenFlowMounted] = useState(false)
+  const [isTitleExpanded, setIsTitleExpanded] = useState(false)
   const [isManageSectionOpen, setIsManageSectionOpen] = useState(() =>
     isManageSectionHash(window.location.hash.slice(1)),
   )
   const mintAssetMenuRef = useRef<HTMLDivElement>(null)
   const toggleTokenFlow = useCallback(() => {
-    setIsTokenFlowOpen((open) => !open)
+    setIsTokenFlowOpen((open) => {
+      if (!open) setIsTokenFlowMounted(true)
+      return !open
+    })
   }, [])
+  const toggleBossEndpoints = useCallback(() => {
+    setIsBossEndpointsOpen((open) => !open)
+  }, [])
+  const expandTitle = useCallback(() => {
+    setIsTitleExpanded(true)
+  }, [])
+  const collapseTitle = useCallback(() => {
+    setIsTitleExpanded(false)
+  }, [])
+  const isCompactHeaderInteraction = useCallback(() => {
+    return window.matchMedia('(max-width: 1024px)').matches
+  }, [])
+  const handleTitlePointerLeave = useCallback(() => {
+    if (isCompactHeaderInteraction()) return
+    collapseTitle()
+  }, [collapseTitle, isCompactHeaderInteraction])
+  const handleTitleClick = useCallback(() => {
+    if (!isCompactHeaderInteraction()) return
+    setIsTitleExpanded((expanded) => !expanded)
+  }, [isCompactHeaderInteraction])
   useEffect(() => {
     const applySection = (section: GraiSection) => {
       if (section === 'mint') setActionView('mint')
@@ -1075,29 +1117,75 @@ function GraiPage() {
 
   return (
     <div className="grai-page">
-      <div className="grai-page-header">
-        <h1>
+      <div className={`grai-page-header${isTitleExpanded ? ' is-title-expanded' : ''}`}>
+        <h1
+          className={`grai-page-title${isTitleExpanded ? ' is-expanded' : ''}`}
+          aria-label="GRAI — GRinders Artificial Index"
+          tabIndex={0}
+          onPointerEnter={expandTitle}
+          onPointerLeave={handleTitlePointerLeave}
+          onClick={handleTitleClick}
+          onFocus={expandTitle}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+              collapseTitle()
+            }
+          }}
+        >
           <span className="grai-page-title-accent">GR</span>
-          inders{' '}
+          <span className="grai-page-title-expand">
+            <span className="grai-page-title-expand-inner">inders</span>
+          </span>
           <span className="grai-page-title-accent">A</span>
-          rtificial{' '}
+          <span className="grai-page-title-expand">
+            <span className="grai-page-title-expand-inner">rtificial</span>
+          </span>
           <span className="grai-page-title-accent">I</span>
-          ndex
+          <span className="grai-page-title-expand">
+            <span className="grai-page-title-expand-inner">ndex</span>
+          </span>
         </h1>
-        <div className="grai-page-info-group">
+        <div className="grai-page-header-actions">
+          <div className="grai-page-info-group">
+            <button
+              type="button"
+              className={`grai-page-info-btn${isTokenFlowOpen ? ' is-active' : ' is-collapsed'}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                toggleTokenFlow()
+              }}
+              aria-expanded={isTokenFlowOpen}
+              aria-controls="grai-token-flow-panel"
+              aria-label="How it works"
+            >
+              <svg
+                className="grai-page-info-btn-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              HOW IT WORKS
+            </button>
+          </div>
           <button
             type="button"
-            className={`grai-page-info-btn${isTokenFlowOpen ? ' is-active' : ' is-collapsed'}`}
+            className={`grai-page-endpoints-btn${isBossEndpointsOpen ? ' is-active' : ' is-collapsed'}`}
             onClick={(event) => {
               event.stopPropagation()
-              toggleTokenFlow()
+              toggleBossEndpoints()
             }}
-            aria-expanded={isTokenFlowOpen}
-            aria-controls="grai-token-flow-panel"
-            aria-label="How it works"
+            aria-expanded={isBossEndpointsOpen}
+            aria-controls="grai-boss-endpoints-panel"
+            aria-label="Boss API endpoints"
           >
             <svg
-              className="grai-page-info-btn-icon"
+              className="grai-page-endpoints-btn-icon"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1108,8 +1196,18 @@ function GraiPage() {
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
-            HOW IT WORKS
+            endpoints
           </button>
+        </div>
+      </div>
+
+      <div
+        id="grai-boss-endpoints-panel"
+        className={`grai-boss-endpoints-panel${isBossEndpointsOpen ? ' is-open' : ''}`}
+        aria-hidden={!isBossEndpointsOpen}
+      >
+        <div className="grai-boss-endpoints-panel-inner">
+          <BossEndpointsTable />
         </div>
       </div>
 
@@ -1119,7 +1217,7 @@ function GraiPage() {
         aria-hidden={!isTokenFlowOpen}
       >
         <div className="grai-token-flow-panel-inner">
-          {isTokenFlowOpen ? (
+          {isTokenFlowMounted ? (
             <Suspense fallback={null}>
               <GraiTokenFlowDiagram />
             </Suspense>
@@ -1150,13 +1248,40 @@ function GraiPage() {
       <div className="grai-bottom-row">
         <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
           <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
+            <span role="columnheader" className="grai-grinders-group-title is-network is-stacked">
+              <GraiFieldInfoButton
+                className="grai-grinders-group-title-label"
+                hint={GRINDER_NETWORK_INFO_HINT}
+                ariaLabel="What network selection means"
+                structured
+              >
+                <span className="grai-grinders-group-general-top">
+                  <span className="grai-grinders-group-title-icon" aria-hidden="true">
+                    {GRINDERS_COLUMN_ICONS.network}
+                  </span>
+                  <span className="grai-grinders-summary-mini-label">NETWORK</span>
+                </span>
+              </GraiFieldInfoButton>
+              {isGrinderNetworkConnected ? (
+                <WalletNetworkSelect variant="compact" ariaLabel="Select wallet network" />
+              ) : (
+                <button
+                  type="button"
+                  className="grai-wallet-connect-btn grai-grinders-network-connect-btn"
+                  onClick={openChainSelector}
+                >
+                  <WalletIcon />
+                  Connect Wallet
+                </button>
+              )}
+            </span>
             <span role="columnheader" className="grai-grinders-group-general is-stacked grai-grinders-summary-general">
               <span className="grai-grinders-group-general-top">
                 <span
                   className={`grai-grinder-active-dot${isBossGrinderLive ? '' : ' is-inactive'}`}
                   aria-hidden="true"
                 />
-                <span className="grai-grinders-live-label">LIVE</span>
+                <span className="grai-grinders-live-label grai-grinders-summary-mini-label">LIVE</span>
               </span>
               {isBossGrinderLoading || isBossUnavailable ? (
                 <span className="grai-grinders-group-general-value grai-grinders-group-general-value--placeholder">
@@ -1170,15 +1295,6 @@ function GraiPage() {
                   isBossUnavailable={isBossUnavailable}
                 />
               )}
-            </span>
-            <span role="columnheader" className="grai-grinders-group-title is-network is-stacked">
-              <span className="grai-grinders-group-title-label">
-                <span className="grai-grinders-group-title-icon" aria-hidden="true">
-                  {GRINDERS_COLUMN_ICONS.network}
-                </span>
-                NETWORK
-              </span>
-              <span className="grai-grinders-group-title-value">{grinderNetworkLabel}</span>
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-uptime is-stacked" style={{ gridColumn: 3 }}>
               <GraiFieldInfoButton
@@ -1198,13 +1314,13 @@ function GraiPage() {
               <GraiFieldInfoButton
                 className="grai-grinders-group-title-label"
                 hint={GRINDER_TVL_INFO_HINT}
-                ariaLabel="How total value locked is calculated"
+                ariaLabel="How value locked is calculated"
                 structured
               >
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.quote}
                 </span>
-                TOTAL VALUE LOCKED
+                VALUE LOCKED
               </GraiFieldInfoButton>
               <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? grinderRows : []} />
             </span>
@@ -1212,13 +1328,13 @@ function GraiPage() {
               <GraiFieldInfoButton
                 className="grai-grinders-group-title-label"
                 hint={GRINDER_YIELD_INFO_HINT}
-                ariaLabel="How total yield is calculated"
+                ariaLabel="How yield is calculated"
                 structured
               >
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.yieldQuote}
                 </span>
-                TOTAL YIELD
+                YIELD
               </GraiFieldInfoButton>
               <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? grinderRows : []} />
             </span>
@@ -1245,6 +1361,10 @@ function GraiPage() {
               aria-label="Grinders table"
             >
               <div className="grai-grinders-row grai-grinders-row--head" role="row">
+              <span role="columnheader" className="grai-grinders-col-head is-last-action-kind">
+                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
+                Last tx
+              </span>
               <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
                 <a
                   href={`${toAppPath('/grai')}#allocate`}
@@ -1266,10 +1386,6 @@ function GraiPage() {
                     ))}
                   </span>
                 </a>
-              </span>
-              <span role="columnheader" className="grai-grinders-col-head is-last-action-kind">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
-                Last tx
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-last-action">
                 <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
@@ -1299,14 +1415,14 @@ function GraiPage() {
             ) : (
             grinderRows.map((row) => (
               <div className="grai-grinders-row" role="row" key={row.id}>
+                <GraiGrinderLastTxCell
+                  lastActionLabel={row.lastActionLabel}
+                  txState={grinderLastTx[row.id]}
+                />
                 <GraiGrinderTableName
                   row={row}
                   copied={copiedGrinderId === row.id}
                   onCopy={copyGrinderTableAddress}
-                />
-                <GraiGrinderLastTxCell
-                  lastActionLabel={row.lastActionLabel}
-                  txState={grinderLastTx[row.id]}
                 />
                 <span role="cell">{row.lastAction}</span>
                 <span role="cell">{row.base}</span>

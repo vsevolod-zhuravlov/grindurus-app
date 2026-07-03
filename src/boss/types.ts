@@ -16,6 +16,8 @@ export type BossGrinderLogPayload = {
   alloc_quote?: number
   spot_price?: number
   terminal?: string
+  network?: string
+  last_tx_hash?: string
   error?: string
 }
 

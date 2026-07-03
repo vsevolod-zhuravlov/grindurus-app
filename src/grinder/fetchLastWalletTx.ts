@@ -157,6 +157,65 @@ export async function fetchLastEvmTxHash(address: string, chainId: number): Prom
   return fetchLastEvmTxViaEtherscan(chainId, address)
 }
 
+const COW_EXPLORER_CHAIN_SLUG: Partial<Record<number, string>> = {
+  1: 'eth',
+  42161: 'arb1',
+  100: 'gno',
+}
+
+function readCaip2EvmChainId(network?: string): number | undefined {
+  const value = network?.trim()
+  if (!value?.startsWith('eip155:')) return undefined
+  const parsed = Number.parseInt(value.slice('eip155:'.length), 10)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function readCaip2SolanaCluster(network?: string): 'mainnet-beta' | 'devnet' | undefined {
+  const value = network?.trim()
+  if (!value?.startsWith('solana:')) return undefined
+  const reference = value.slice('solana:'.length).toLowerCase()
+  if (reference === 'mainnet' || reference === 'mainnet-beta') return 'mainnet-beta'
+  if (reference === 'devnet') return 'devnet'
+  return undefined
+}
+
+function isCowTerminal(terminal?: string): boolean {
+  const normalized = terminal?.trim().toLowerCase() ?? ''
+  return normalized === 'cow' || normalized === 'evm_cow_protocol'
+}
+
+export function resolveGrinderChainId(params: { terminal?: string; network?: string }): number {
+  return readCaip2EvmChainId(params.network) ?? resolveEvmChainIdForTerminal(params.terminal)
+}
+
+export function resolveGrinderTxExplorerUrl(params: {
+  hash: string
+  terminal?: string
+  network?: string
+}): string | null {
+  const hash = params.hash.trim()
+  if (!hash) return null
+
+  const solanaCluster = readCaip2SolanaCluster(params.network)
+  if (solanaCluster) {
+    return solscanTxUrl(solanaCluster, hash)
+  }
+
+  const normalizedTerminal = params.terminal?.trim().toLowerCase() ?? ''
+  if (normalizedTerminal === 'solana' || normalizedTerminal === 'jupiter') {
+    const cluster = solanaCluster ?? getDefaultGraiSolanaCluster()
+    return solscanTxUrl(cluster, hash)
+  }
+
+  const chainId = resolveGrinderChainId(params)
+  if (isCowTerminal(params.terminal)) {
+    const slug = COW_EXPLORER_CHAIN_SLUG[chainId]
+    if (slug) return `https://explorer.cow.fi/${slug}/orders/${hash}`
+  }
+
+  return evmTxExplorerUrl(chainId, hash)
+}
+
 export async function fetchLastWalletTx(params: {
   address: string
   terminal?: string
