@@ -1,4 +1,5 @@
 export type BossEndpointRow = {
+  health: string
   metaName: string
   uri: string
   auth: 'public' | 'boss-key' | 'grind-key'
@@ -7,6 +8,7 @@ export type BossEndpointRow = {
 }
 
 export const BOSS_ENDPOINT_EXAMPLE: BossEndpointRow = {
+  health: 'health',
   metaName: 'health',
   uri: '/health',
   auth: 'public',

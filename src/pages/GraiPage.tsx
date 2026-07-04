@@ -802,10 +802,10 @@ function GraiWalletActorRow({
           <span className="grai-mint-asset-address-actions">
             <button
               type="button"
-              className="grai-wallet-connect-btn grai-mint-feedback-wallet-connect"
+              className="connect-wallet-btn grai-mint-feedback-wallet-connect"
               onClick={onConnect}
             >
-              <WalletIcon size={14} />
+              <WalletIcon />
               Connect Wallet
             </button>
           </span>
@@ -1267,7 +1267,7 @@ function GraiPage() {
               ) : (
                 <button
                   type="button"
-                  className="grai-wallet-connect-btn grai-grinders-network-connect-btn"
+                  className="connect-wallet-btn grai-grinders-network-connect-btn"
                   onClick={openChainSelector}
                 >
                   <WalletIcon />
@@ -1362,8 +1362,10 @@ function GraiPage() {
             >
               <div className="grai-grinders-row grai-grinders-row--head" role="row">
               <span role="columnheader" className="grai-grinders-col-head is-last-action-kind">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
-                Last tx
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastAction}</span>
+                  <span className="grai-grinders-col-head-label">Last tx</span>
+                </span>
               </span>
               <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
                 <a
@@ -1388,24 +1390,34 @@ function GraiPage() {
                 </a>
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-last-action">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
-                Last action time
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.lastActionTime}</span>
+                  <span className="grai-grinders-col-head-label">Last action time</span>
+                </span>
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-base">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.base}</span>
-                Base
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.base}</span>
+                  <span className="grai-grinders-col-head-label">Base</span>
+                </span>
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-quote">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.quote}</span>
-                Quote
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.quote}</span>
+                  <span className="grai-grinders-col-head-label">Quote</span>
+                </span>
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-yield-base">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldBase}</span>
-                Yield base
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldBase}</span>
+                  <span className="grai-grinders-col-head-label">Yield base</span>
+                </span>
               </span>
               <span role="columnheader" className="grai-grinders-col-head is-yield-quote">
-                <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldQuote}</span>
-                Yield quote
+                <span className="grai-grinders-col-head-inner">
+                  <span className="grai-grinders-col-icon">{GRINDERS_COLUMN_ICONS.yieldQuote}</span>
+                  <span className="grai-grinders-col-head-label">Yield quote</span>
+                </span>
               </span>
             </div>
             {grinderRows.length === 0 ? (

@@ -10,6 +10,7 @@ export function BossEndpointsTable() {
         <table className="grai-boss-endpoints-table">
           <thead>
             <tr>
+              <th scope="col">Health</th>
               <th scope="col">Meta name</th>
               <th scope="col">URI</th>
               <th scope="col">Auth</th>
@@ -17,6 +18,9 @@ export function BossEndpointsTable() {
           </thead>
           <tbody>
             <tr>
+              <td>
+                <code className="grai-boss-endpoint-health">{row.health}</code>
+              </td>
               <td>
                 <span className="grai-boss-endpoint-meta-cell">
                   <code className="grai-boss-endpoint-meta-name">{row.metaName}</code>
