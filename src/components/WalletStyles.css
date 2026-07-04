@@ -724,6 +724,13 @@ html:has(body[data-scroll-locked]) body {
   border-color: rgba(255, 105, 180, 0.5);
 }
 
+.wallet-network-caip2 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+}
+
 .network-logo {
   display: flex;
   align-items: center;
@@ -1073,9 +1080,31 @@ html:has(body[data-scroll-locked]) body {
   flex-shrink: 0;
 }
 
-.wallet-network-select-item .network-name {
+.wallet-network-select-item .network-name-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
   flex: 1;
+  min-width: 0;
+}
+
+.wallet-network-select-item .network-name {
+  flex: 0 0 auto;
   text-align: left;
+}
+
+.wallet-network-select-item .network-caip2 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.wallet-network-select-item.active .network-caip2 {
+  color: rgba(255, 105, 180, 0.75);
 }
 
 .wallet-dropdown-network {
@@ -1524,6 +1553,14 @@ html:has(body[data-scroll-locked]) body {
   color: #ff1493;
 }
 
+[data-theme="light"] .wallet-network-select-item .network-caip2 {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .wallet-network-select-item.active .network-caip2 {
+  color: rgba(255, 20, 147, 0.65);
+}
+
 [data-theme="light"] .wallet-dropdown-address {
   background: rgba(0, 0, 0, 0.03);
 }
@@ -1704,7 +1741,8 @@ html:has(body[data-scroll-locked]) body {
   }
 
   .header-wallet-slot--connected .wallet-info-btn .wallet-address,
-  .header-wallet-slot--connected .wallet-info-btn .wallet-expand-toggle {
+  .header-wallet-slot--connected .wallet-info-btn .wallet-expand-toggle,
+  .header-wallet-slot--connected .wallet-info-btn .wallet-network-caip2 {
     display: none;
   }
 

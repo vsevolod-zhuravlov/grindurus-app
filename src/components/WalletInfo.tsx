@@ -4,6 +4,7 @@ import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useEvmWallet } from '../hooks/useEvmWallet'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import baseNetworkIcon from '../assets/base-network.svg'
+import { evmChainIdToCaip2, solanaClusterToCaip2 } from '../wallet/caip2Network'
 import { WalletExpandToggle } from './WalletExpandToggle'
 import './WalletStyles.css'
 
@@ -249,6 +250,8 @@ export function WalletInfo() {
               <button
                 className="wallet-network-select-btn"
                 onClick={() => setIsNetworkDropdownOpen((v) => !v)}
+                title={activeWallet.networkCaip2 ?? undefined}
+                data-network-caip2={activeWallet.networkCaip2 ?? undefined}
               >
                 <span className="wallet-network-select-main">
                   {getSelectedDropdownNetworkIcon()}
@@ -275,6 +278,8 @@ export function WalletInfo() {
                         key={chain.id}
                         className={`wallet-network-select-item ${evmWallet.chainId === chain.id ? 'active' : ''}`}
                         onClick={() => handleNetworkSelect(chain.id)}
+                        title={evmChainIdToCaip2(chain.id)}
+                        data-network-caip2={evmChainIdToCaip2(chain.id)}
                       >
                         <span className={`network-icon-svg ${chain.name.toLowerCase()}`}>
                           {chain.name === 'Ethereum' && (
@@ -306,7 +311,10 @@ export function WalletInfo() {
                             <img src={baseNetworkIcon} alt={chain.name} width={20} height={20} />
                           )}
                         </span>
-                        <span className="network-name">{chain.name}</span>
+                        <span className="network-name-wrap">
+                          <span className="network-name">{chain.name}</span>
+                          <span className="network-caip2">{evmChainIdToCaip2(chain.id)}</span>
+                        </span>
                       </button>
                     ))}
                   {activeWallet.chainType === 'solana' &&
@@ -315,6 +323,8 @@ export function WalletInfo() {
                         key={cluster.id}
                         className={`wallet-network-select-item ${solanaWallet.cluster === cluster.id ? 'active' : ''}`}
                         onClick={() => handleClusterSelect(cluster.id)}
+                        title={solanaClusterToCaip2(cluster.id)}
+                        data-network-caip2={solanaClusterToCaip2(cluster.id)}
                       >
                         <span className={`network-icon-svg ${cluster.id === 'devnet' ? 'solana-devnet' : 'solana'}`}>
                           <svg width="16" height="16" viewBox="0 0 397 311" fill="currentColor">
@@ -323,7 +333,10 @@ export function WalletInfo() {
                             <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z"/>
                           </svg>
                         </span>
-                        <span className="network-name">{cluster.name}</span>
+                        <span className="network-name-wrap">
+                          <span className="network-name">{cluster.name}</span>
+                          <span className="network-caip2">{solanaClusterToCaip2(cluster.id)}</span>
+                        </span>
                       </button>
                     ))}
                 </div>

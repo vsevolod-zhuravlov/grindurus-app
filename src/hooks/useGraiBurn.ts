@@ -12,11 +12,13 @@ export function useGraiBurn() {
   const [status, setStatus] = useState<GraiBurnStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [lastSignature, setLastSignature] = useState<string | null>(null)
+  const [lastAmountLabel, setLastAmountLabel] = useState<string | null>(null)
 
   const burn = useCallback(
     async (params: { amountInput: string }) => {
       setError(null)
       setLastSignature(null)
+      setLastAmountLabel(null)
 
       if (!solanaWallet.publicKey) {
         solanaWallet.connect()
@@ -50,7 +52,7 @@ export function useGraiBurn() {
         }
 
         setStatus('confirming')
-        const { signature } = await executeBurn({
+        const { signature, amountLabel } = await executeBurn({
           connection,
           config: solana,
           burner,
@@ -59,6 +61,7 @@ export function useGraiBurn() {
         })
 
         setLastSignature(signature)
+        setLastAmountLabel(amountLabel)
         setStatus('success')
         return signature
       } catch (burnError) {
@@ -76,6 +79,7 @@ export function useGraiBurn() {
     setStatus('idle')
     setError(null)
     setLastSignature(null)
+    setLastAmountLabel(null)
   }, [])
 
   return {
@@ -84,6 +88,7 @@ export function useGraiBurn() {
     status,
     error,
     lastSignature,
+    lastAmountLabel,
     isBurning: status === 'building' || status === 'signing' || status === 'confirming',
   }
 }

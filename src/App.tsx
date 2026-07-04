@@ -70,7 +70,13 @@ function App() {
       <Header activeView={mainView} onViewChange={handleViewChange} />
       <main className={`App-main ${route === 'backtest' ? 'App-main--backtest' : ''}`}>
         {route === 'grai' || route === 'grai-manage' ? (
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <div className="App-main-loading" role="status">
+                Loading GRAI…
+              </div>
+            }
+          >
             <GraiPage />
           </Suspense>
         ) : isEvmStackReady ? (

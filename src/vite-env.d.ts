@@ -30,6 +30,7 @@ interface ImportMetaEnv {
   readonly VITE_BOSS_API_URL?: string
   readonly VITE_BOSS_API_KEY?: string
   readonly VITE_BOSS_API_AUTH_HEADER?: string
+  readonly VITE_GRAI_METADATA_URL?: string
   readonly VITE_GRINDER1_BOSS_ID?: string
   readonly VITE_GRINDER2_BOSS_ID?: string
   readonly VITE_GRINDER3_BOSS_ID?: string

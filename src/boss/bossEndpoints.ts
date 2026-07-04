@@ -8,9 +8,9 @@ export type BossEndpointRow = {
 }
 
 export const BOSS_ENDPOINT_EXAMPLE: BossEndpointRow = {
-  health: 'health',
-  metaName: 'health',
-  uri: '/health',
+  health: 'ok (boss)',
+  metaName: 'boss',
+  uri: 'https://boss.grindurus.xyz',
   auth: 'public',
 }
 

@@ -1,5 +1,11 @@
-import { fetchBossGrindersSnapshot, mergeBossLogsSnapshots } from './bossGrindersBootstrap'
-import { bossRequestHeaders, resolveBossApiUrl } from './bossApi'
+import {
+  fetchBossGrindersSnapshot,
+  mergeBossLogsSnapshots,
+  resolveBossGrinderEndpointUrls,
+  scopeBossGrinderSnapshot,
+} from './bossGrindersBootstrap'
+import { bossRequestHeaders } from './bossApi'
+import { resolveBossFetchUrl } from './bossProbe'
 import type { BossGrinderLogsSnapshot } from './types'
 
 type BossLogsListener = {
@@ -49,17 +55,24 @@ function consumeCompleteEvents(buffer: string, onMessage: (data: string) => void
   return remaining
 }
 
+function sameBossUrlList(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((url, index) => url === b[index])
+}
+
 class BossLogsStreamHub {
   private listeners = new Set<BossLogsListener>()
   private snapshot: BossGrinderLogsSnapshot = {}
-  private abort: AbortController | null = null
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private reconnectAttempt = 0
+  private bossUrls: string[] = []
+  private abortByBoss = new Map<string, AbortController>()
+  private reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private reconnectAttempts = new Map<string, number>()
+  private readingBosses = new Set<string>()
   private started = false
-  private isConnected = false
-  private isReading = false
+  private connectedBosses = new Set<string>()
   private bootstrapped = false
   private bootstrapReachable = true
+  private sessionGeneration = 0
 
   start(): void {
     if (this.started) return
@@ -67,10 +80,29 @@ class BossLogsStreamHub {
     void this.startSession()
   }
 
-  private async startSession(): Promise<void> {
+  setBossUrls(bossUrls: string[]): void {
+    const next = resolveBossGrinderEndpointUrls(bossUrls)
+    if (sameBossUrlList(this.bossUrls, next)) return
+    this.bossUrls = next
     if (!this.started) return
+    void this.restartSession()
+  }
+
+  private async restartSession(): Promise<void> {
+    this.sessionGeneration += 1
+    this.abortAllConnections()
+    this.snapshot = {}
+    this.bootstrapped = false
+    this.bootstrapReachable = true
+    this.connectedBosses.clear()
+    await this.startSession()
+  }
+
+  private async startSession(): Promise<void> {
+    const generation = this.sessionGeneration
     await this.bootstrapFromGrinders()
-    await this.openConnection()
+    if (generation !== this.sessionGeneration) return
+    await this.openAllConnections(generation)
   }
 
   subscribe(listener: BossLogsListener): () => void {
@@ -83,7 +115,7 @@ class BossLogsStreamHub {
     if (this.bootstrapped) {
       listener.onBootstrap?.(this.bootstrapReachable)
     }
-    if (this.isConnected) {
+    if (this.connectedBosses.size > 0) {
       listener.onOpen?.()
     }
 
@@ -101,14 +133,12 @@ class BossLogsStreamHub {
   }
 
   private emitOpen(): void {
-    this.isConnected = true
     for (const listener of this.listeners) {
       listener.onOpen?.()
     }
   }
 
   private emitError(message: string | null): void {
-    this.isConnected = false
     for (const listener of this.listeners) {
       listener.onError?.(message)
     }
@@ -122,25 +152,47 @@ class BossLogsStreamHub {
     }
   }
 
-  private clearReconnectTimer(): void {
-    if (this.reconnectTimer != null) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
+  private clearReconnectTimer(baseUrl: string): void {
+    const timer = this.reconnectTimers.get(baseUrl)
+    if (timer != null) {
+      clearTimeout(timer)
+      this.reconnectTimers.delete(baseUrl)
     }
   }
 
-  private scheduleReconnect(): void {
-    if (!this.started || this.reconnectTimer) return
-    const delay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)]
-    this.reconnectAttempt += 1
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null
-      void this.openConnection()
+  private scheduleReconnect(baseUrl: string): void {
+    if (!this.started || this.reconnectTimers.has(baseUrl)) return
+    const attempt = this.reconnectAttempts.get(baseUrl) ?? 0
+    const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]
+    this.reconnectAttempts.set(baseUrl, attempt + 1)
+    const timer = setTimeout(() => {
+      this.reconnectTimers.delete(baseUrl)
+      void this.openConnectionForBoss(baseUrl, this.sessionGeneration)
     }, delay)
+    this.reconnectTimers.set(baseUrl, timer)
+  }
+
+  private abortAllConnections(): void {
+    for (const timer of this.reconnectTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.reconnectTimers.clear()
+    for (const abort of this.abortByBoss.values()) {
+      abort.abort()
+    }
+    this.abortByBoss.clear()
+    this.readingBosses.clear()
+    this.connectedBosses.clear()
+    this.reconnectAttempts.clear()
+  }
+
+  private scopeIncomingSnapshot(baseUrl: string, snapshot: BossGrinderLogsSnapshot): BossGrinderLogsSnapshot {
+    if (this.bossUrls.length <= 1) return snapshot
+    return scopeBossGrinderSnapshot(baseUrl, snapshot, { prefixNames: true })
   }
 
   private async bootstrapFromGrinders(): Promise<void> {
-    const result = await fetchBossGrindersSnapshot()
+    const result = await fetchBossGrindersSnapshot(this.bossUrls)
     if (result.ok) {
       if (Object.keys(result.snapshot).length > 0) {
         this.emitSnapshot(result.snapshot)
@@ -152,20 +204,27 @@ class BossLogsStreamHub {
     this.emitError('Boss API is unreachable')
   }
 
-  private async openConnection(): Promise<void> {
-    if (!this.started || this.isReading) return
+  private async openAllConnections(generation: number): Promise<void> {
+    const urls = this.bossUrls.length > 0 ? this.bossUrls : []
+    if (urls.length === 0) return
+    await Promise.all(urls.map((baseUrl) => this.openConnectionForBoss(baseUrl, generation)))
+  }
 
-    this.clearReconnectTimer()
-    this.abort?.abort()
+  private async openConnectionForBoss(baseUrl: string, generation: number): Promise<void> {
+    if (!this.started || generation !== this.sessionGeneration || this.readingBosses.has(baseUrl)) return
+
+    this.clearReconnectTimer(baseUrl)
+    this.abortByBoss.get(baseUrl)?.abort()
+
     const ac = new AbortController()
-    this.abort = ac
-    this.isReading = true
+    this.abortByBoss.set(baseUrl, ac)
+    this.readingBosses.add(baseUrl)
 
     try {
       const headers = new Headers(bossRequestHeaders())
       headers.set('Accept', 'text/event-stream')
 
-      const res = await fetch(resolveBossApiUrl('/logs'), {
+      const res = await fetch(resolveBossFetchUrl(baseUrl, '/logs'), {
         signal: ac.signal,
         credentials: 'same-origin',
         headers,
@@ -175,14 +234,16 @@ class BossLogsStreamHub {
         throw new Error(`Boss logs stream HTTP ${res.status}`)
       }
 
-      this.reconnectAttempt = 0
+      this.reconnectAttempts.set(baseUrl, 0)
+      this.connectedBosses.add(baseUrl)
       this.emitOpen()
+      this.emitError(null)
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
 
-      while (!ac.signal.aborted) {
+      while (!ac.signal.aborted && generation === this.sessionGeneration) {
         const { done, value } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
@@ -190,7 +251,7 @@ class BossLogsStreamHub {
           try {
             const parsed = JSON.parse(raw) as BossGrinderLogsSnapshot
             if (parsed && typeof parsed === 'object') {
-              this.emitSnapshot(parsed)
+              this.emitSnapshot(this.scopeIncomingSnapshot(baseUrl, parsed))
             }
           } catch {
             this.emitError('Failed to parse boss log stream')
@@ -198,24 +259,23 @@ class BossLogsStreamHub {
         })
       }
 
-      if (!ac.signal.aborted) {
-        this.emitError(null)
-        this.scheduleReconnect()
+      if (!ac.signal.aborted && generation === this.sessionGeneration) {
+        this.connectedBosses.delete(baseUrl)
+        this.scheduleReconnect(baseUrl)
       }
     } catch (error) {
       if ((error as DOMException)?.name === 'AbortError') return
-      this.emitError(null)
-      this.scheduleReconnect()
+      this.connectedBosses.delete(baseUrl)
+      if (generation === this.sessionGeneration) {
+        this.scheduleReconnect(baseUrl)
+      }
     } finally {
-      this.isReading = false
-      if (this.abort === ac) {
-        this.abort = null
+      this.readingBosses.delete(baseUrl)
+      if (this.abortByBoss.get(baseUrl) === ac) {
+        this.abortByBoss.delete(baseUrl)
       }
     }
   }
 }
 
 export const bossLogsStream = new BossLogsStreamHub()
-
-// One app-wide stream for the whole session.
-bossLogsStream.start()

@@ -7,9 +7,11 @@ import type { GraiAsset } from '../grai/knownMints'
 import type { GraiAssetVaultBalances } from '../grai/fetchVaultBalances'
 import { USD_SCALE } from '../grai/tokenomics'
 import { useBossGrinderTable } from '../hooks/useBossGrinderTable'
+import { useGraiBossUrls } from '../hooks/useGraiTokenMetadata'
 import { useGrinderLastTx, type GrinderLastTxEntry } from '../hooks/useGrinderLastTx'
 import { formatTxHashShort } from '../grinder/formatTxHash'
-import { isGrinderStatusLive, type GrinderTableRow } from '../boss/grinderTable'
+import { isGrinderStatusLive, summarizeGrinderTableRows, type GrinderTableRow } from '../boss/grinderTable'
+import { grinderRowMatchesCaip2Network } from '../wallet/caip2Network'
 import { useGraiAssets } from '../hooks/useGraiAssets'
 import { useGraiBurn } from '../hooks/useGraiBurn'
 import { useGraiBurnEstimate } from '../hooks/useGraiBurnEstimate'
@@ -20,8 +22,6 @@ import { useGraiVaultBalances } from '../hooks/useGraiVaultBalances'
 import { useWalletAssetBalance } from '../hooks/useWalletAssetBalance'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { FloatingTokenBackground, STABLE_FLOATING_TOKENS } from '../components/FloatingTokenBackground'
-import { GraiNavDonut } from '../components/GraiNavDonut'
-import { BossEndpointsTable } from '../components/BossEndpointsTable'
 import { WalletNetworkSelect } from '../components/WalletNetworkSelect'
 import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useWalletContext } from '../providers/AppWalletProvider'
@@ -39,6 +39,12 @@ const GraiTokenFlowDiagram = lazy(() =>
 )
 const GraiManageSection = lazy(() =>
   import('./GraiManagePage').then((m) => ({ default: m.GraiManageSection })),
+)
+const GraiNavDonut = lazy(() =>
+  import('../components/GraiNavDonut').then((m) => ({ default: m.GraiNavDonut })),
+)
+const BossEndpointsTable = lazy(() =>
+  import('../components/BossEndpointsTable').then((m) => ({ default: m.BossEndpointsTable })),
 )
 
 function isManageSectionHash(hash: string): boolean {
@@ -258,20 +264,6 @@ const GRINDER_YIELD_INFO_HINT = (
     <p className="grai-field-info-tooltip-note">
       <code>spot_price</code> is quote per base unit from Boss logs. Displayed as USD when quote is USDC/USDT.
     </p>
-  </>
-)
-
-const GRINDER_NETWORK_INFO_HINT = (
-  <>
-    <span className="grai-field-info-tooltip-title">Network</span>
-    <span className="grai-field-info-tooltip-section">
-      <span className="grai-field-info-tooltip-section-label">Definition</span>
-      The chain your connected wallet is on — EVM (Ethereum, Arbitrum, Base, …) or Solana (Mainnet / Devnet).
-    </span>
-    <span className="grai-field-info-tooltip-section">
-      <span className="grai-field-info-tooltip-section-label">Selection</span>
-      Use the dropdown to switch networks when a wallet is connected, or Connect Wallet to pick a chain first.
-    </span>
   </>
 )
 
@@ -556,6 +548,26 @@ const FIELD_INFO_ICON = (
     <path d="M12 8h.01" />
   </svg>
 )
+
+function GraiGrindersTotalLabel({
+  showTotal,
+  rest,
+}: {
+  showTotal: boolean
+  rest: string
+}) {
+  return (
+    <span className="grai-grinders-filter-total-label">
+      <span
+        className={`grai-grinders-filter-total-prefix${showTotal ? ' is-visible' : ''}`}
+        aria-hidden={showTotal ? undefined : true}
+      >
+        <span className="grai-grinders-filter-total-prefix-inner">TOTAL </span>
+      </span>
+      {rest}
+    </span>
+  )
+}
 
 function GraiFieldInfoButton({
   hint,
@@ -874,7 +886,7 @@ function GraiPage() {
   const { totalSupplyLabel, isLoading: totalSupplyLoading, refresh: refreshTotalSupply } = useGraiTotalSupply()
   const { mint: mintGrai, status: mintStatus, error: mintError, lastSignature: mintSignature, isMinting, reset: resetMint } =
     useGraiMint()
-  const { burn: burnGrai, status: burnStatus, error: burnError, lastSignature: burnSignature, isBurning, reset: resetBurn } =
+  const { burn: burnGrai, status: burnStatus, error: burnError, lastSignature: burnSignature, lastAmountLabel: burnAmountLabel, isBurning, reset: resetBurn } =
     useGraiBurn()
   const { isConnected: isSolanaConnected, shortAddress, address: connectedWalletAddress } = useSolanaWallet()
   const [actionView, setActionView] = useState<'mint' | 'burn'>('mint')
@@ -884,23 +896,38 @@ function GraiPage() {
   const [minterWalletCopied, setMinterWalletCopied] = useState(false)
   const [burnAmount, setBurnAmount] = useState('')
   const [isLegendTableHidden, setIsLegendTableHidden] = useState(false)
+  const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
+  const [isGrindersFilterEnabled, setIsGrindersFilterEnabled] = useState(false)
+  const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
+  const bossMetadata = useGraiBossUrls()
   const {
     rows: grinderRows,
-    summary: bossGrinderSummary,
     isLive: isBossGrinderLive,
     isBootstrapped: isBossGrinderBootstrapped,
     isBossUnavailable,
-  } = useBossGrinderTable()
-  const grinderLastTx = useGrinderLastTx(grinderRows, isBossGrinderLive)
+  } = useBossGrinderTable(bossMetadata.bossUrls, bossMetadata.status === 'ready')
+  const walletNetworkCaip2 = activeWallet.networkCaip2
+  const isGrindersNetworkFilterActive = isGrindersFilterEnabled && Boolean(walletNetworkCaip2)
+  const displayGrinderRows = useMemo(() => {
+    if (!isGrindersNetworkFilterActive || !walletNetworkCaip2) return grinderRows
+    return grinderRows.filter((row) => grinderRowMatchesCaip2Network(row, walletNetworkCaip2))
+  }, [grinderRows, isGrindersNetworkFilterActive, walletNetworkCaip2])
+  const displayGrinderSummary = useMemo(
+    () => summarizeGrinderTableRows(displayGrinderRows),
+    [displayGrinderRows],
+  )
+  const grinderLastTx = useGrinderLastTx(displayGrinderRows, isBossGrinderLive)
   const isBossGrinderLoading = !isBossGrinderBootstrapped
-  const grinderTotalCount = bossGrinderSummary.totalCount
-  const grinderActiveCount = bossGrinderSummary.activeCount
-  const grinderTvlUsd = bossGrinderSummary.tvlUsd
-  const grinderYieldUsd = bossGrinderSummary.yieldUsd
-  const isGrinderNetworkConnected = activeWallet.isConnected && Boolean(activeWallet.networkName)
+  const grinderTotalCount = displayGrinderSummary.totalCount
+  const grinderActiveCount = displayGrinderSummary.activeCount
+  const grinderTvlUsd = displayGrinderSummary.tvlUsd
+  const grinderYieldUsd = displayGrinderSummary.yieldUsd
+  const isGrinderNetworkConnected = activeWallet.isConnected && Boolean(walletNetworkCaip2)
   const grinderUptimeLabel = isBossGrinderLive ? '99.999%' : '—'
-  const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
-  const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
+  const toggleGrindersFilter = useCallback(() => {
+    setIsGrindersFilterEnabled((enabled) => !enabled)
+  }, [])
+  const showGrindersTotalLabels = !isGrindersFilterEnabled
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
   const [isBossEndpointsOpen, setIsBossEndpointsOpen] = useState(false)
@@ -1220,7 +1247,11 @@ function GraiPage() {
         aria-hidden={!isBossEndpointsOpen}
       >
         <div className="grai-boss-endpoints-panel-inner">
-          <BossEndpointsTable />
+          {isBossEndpointsOpen ? (
+            <Suspense fallback={<span className="grai-boss-endpoints-status">Loading endpoints…</span>}>
+              <BossEndpointsTable />
+            </Suspense>
+          ) : null}
         </div>
       </div>
 
@@ -1262,24 +1293,39 @@ function GraiPage() {
         <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
           <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
             <span role="columnheader" className="grai-grinders-group-title is-network is-stacked">
-              <GraiFieldInfoButton
-                className="grai-grinders-group-title-label"
-                hint={GRINDER_NETWORK_INFO_HINT}
-                ariaLabel="What network selection means"
-                structured
-              >
-                <span className="grai-grinders-group-general-top">
-                  <span className="grai-grinders-group-title-icon" aria-hidden="true">
-                    {GRINDERS_COLUMN_ICONS.network}
+              <span className="grai-grinders-network-with-filter">
+                <span className="grai-grinders-network-body">
+                  <button
+                    type="button"
+                    role="switch"
+                    className={`grai-grinders-filter-toggle${isGrindersFilterEnabled ? ' is-active' : ''}`}
+                    onClick={toggleGrindersFilter}
+                    aria-checked={isGrindersFilterEnabled}
+                    aria-label={isGrindersFilterEnabled ? 'Disable grinder network filter' : 'Enable grinder network filter'}
+                  >
+                    <span className="grai-grinders-filter-toggle-stack" aria-hidden="true">
+                      <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--all">
+                        TOTAL
+                      </span>
+                      <span className="grai-grinders-filter-toggle-track">
+                        <span className="grai-grinders-filter-toggle-thumb" />
+                      </span>
+                      <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--network">
+                        BY NETWORK
+                      </span>
+                    </span>
+                  </button>
+                  <span className="grai-grinders-network-main">
+                    <span className="grai-grinders-network-action">
+                      {isGrinderNetworkConnected ? (
+                        <WalletNetworkSelect variant="compact" ariaLabel="Select wallet network" />
+                      ) : (
+                        <GraiGrindersSummaryConnectButton onConnect={openChainSelector} />
+                      )}
+                    </span>
                   </span>
-                  <span className="grai-grinders-summary-mini-label">NETWORK</span>
                 </span>
-              </GraiFieldInfoButton>
-              {isGrinderNetworkConnected ? (
-                <WalletNetworkSelect variant="compact" ariaLabel="Select wallet network" />
-              ) : (
-                <GraiGrindersSummaryConnectButton onConnect={openChainSelector} />
-              )}
+              </span>
             </span>
             <span role="columnheader" className="grai-grinders-group-general is-stacked grai-grinders-summary-general">
               <span className="grai-grinders-group-general-top">
@@ -1289,9 +1335,7 @@ function GraiPage() {
                 />
                 <span className="grai-grinders-live-label grai-grinders-summary-mini-label">LIVE</span>
               </span>
-              {!isGrinderNetworkConnected ? (
-                <span className="grai-grinders-group-general-value">-/- GRINDERS</span>
-              ) : isBossGrinderLoading || isBossUnavailable ? (
+              {isBossGrinderLoading || isBossUnavailable ? (
                 <span className="grai-grinders-group-general-value grai-grinders-group-general-value--placeholder">
                   {isBossGrinderLoading ? '…' : '—'}
                 </span>
@@ -1316,8 +1360,10 @@ function GraiPage() {
                 </span>
                 UPTIME
               </GraiFieldInfoButton>
-              {!isGrinderNetworkConnected ? (
-                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              {isBossGrinderLoading || isBossUnavailable ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">
+                  {isBossGrinderLoading ? '…' : '—'}
+                </span>
               ) : (
                 <span className="grai-grinders-group-title-value">{grinderUptimeLabel}</span>
               )}
@@ -1332,12 +1378,14 @@ function GraiPage() {
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.quote}
                 </span>
-                VALUE LOCKED
+                <GraiGrindersTotalLabel showTotal={showGrindersTotalLabels} rest="VALUE LOCKED" />
               </GraiFieldInfoButton>
-              {!isGrinderNetworkConnected ? (
-                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              {isBossGrinderLoading || isBossUnavailable ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">
+                  {isBossGrinderLoading ? '…' : '—'}
+                </span>
               ) : (
-                <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? grinderRows : []} />
+                <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? displayGrinderRows : []} />
               )}
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-yield is-stacked" style={{ gridColumn: '6 / span 2' }}>
@@ -1350,12 +1398,14 @@ function GraiPage() {
                 <span className="grai-grinders-group-title-icon" aria-hidden="true">
                   {GRINDERS_COLUMN_ICONS.yieldQuote}
                 </span>
-                YIELD
+                <GraiGrindersTotalLabel showTotal={showGrindersTotalLabels} rest="YIELD" />
               </GraiFieldInfoButton>
-              {!isGrinderNetworkConnected ? (
-                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              {isBossGrinderLoading || isBossUnavailable ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">
+                  {isBossGrinderLoading ? '…' : '—'}
+                </span>
               ) : (
-                <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? grinderRows : []} />
+                <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? displayGrinderRows : []} />
               )}
             </span>
           </div>
@@ -1398,7 +1448,7 @@ function GraiPage() {
                   }}
                 >
                   <span className="grai-grinders-col-logos" aria-hidden="true">
-                    {grinderRows.map((row) => (
+                    {displayGrinderRows.map((row) => (
                       <img
                         key={row.id}
                         src={assetUrl('logo.png')}
@@ -1440,12 +1490,14 @@ function GraiPage() {
                 </span>
               </span>
             </div>
-            {grinderRows.length === 0 ? (
+            {displayGrinderRows.length === 0 ? (
               <p className="grai-grinders-boss-status is-empty" role="status">
-                No grinders in the Boss fleet.
+                {isGrindersNetworkFilterActive
+                  ? `No grinders on ${walletNetworkCaip2}.`
+                  : 'No grinders in the Boss fleet.'}
               </p>
             ) : (
-            grinderRows.map((row) => (
+            displayGrinderRows.map((row) => (
               <div className="grai-grinders-row" role="row" key={row.id}>
                 <GraiGrinderLastTxCell
                   lastActionLabel={row.lastActionLabel}
@@ -1928,60 +1980,70 @@ function GraiPage() {
                     </div>
                     <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
                       <div className="grai-burn-assets-section-title">
-                        <span className="grai-estimated-amount-prefix" aria-label="Burner">
-                          <button
-                            type="button"
-                            className={`grai-donut-legend-toggle grai-burn-assets-section-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
-                            onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
-                            aria-expanded={!isBurnAssetsRowsHidden}
-                            aria-controls="grai-burn-assets-rows"
-                            aria-label={
-                              isBurnAssetsRowsHidden
-                                ? 'Show senior vault shares breakdown'
-                                : 'Hide senior vault shares breakdown'
-                            }
-                          >
-                            <svg
-                              className="grai-donut-legend-toggle-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M6 9l6 6 6-6" />
-                            </svg>
-                          </button>
-                          {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
-                            <>
-                              BURNER
-                              <span className="grai-burn-estimate-sigma" aria-hidden="true">
-                                Σ
-                              </span>
-                            </>
-                          ) : null}
-                        </span>
-                        {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
-                          <span
-                            className={`grai-burn-estimate-value${
-                              !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
-                                ? ' is-placeholder'
-                                : ''
-                            }`}
-                          >
-                            {burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—') ? (
-                              isBurnEstimateLoading ? (
-                                <span className="grai-estimate-spinner" aria-label="Calculating burn value estimate" />
-                              ) : (
-                                `~${burnTotalUsdLabel}`
-                              )
-                            ) : (
-                              '$0'
-                            )}
+                        {burnSignature && burnStatus === 'success' && burnAmountLabel ? (
+                          <span className="grai-burn-confirmed-title">
+                            BURNT{' '}
+                            <span className="grai-burn-confirmed-amount">{burnAmountLabel}</span>{' '}
+                            GRAI
                           </span>
-                        ) : null}
+                        ) : (
+                          <>
+                            <span className="grai-estimated-amount-prefix" aria-label="Burner">
+                              <button
+                                type="button"
+                                className={`grai-donut-legend-toggle grai-burn-assets-section-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
+                                onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
+                                aria-expanded={!isBurnAssetsRowsHidden}
+                                aria-controls="grai-burn-assets-rows"
+                                aria-label={
+                                  isBurnAssetsRowsHidden
+                                    ? 'Show senior vault shares breakdown'
+                                    : 'Hide senior vault shares breakdown'
+                                }
+                              >
+                                <svg
+                                  className="grai-donut-legend-toggle-icon"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </button>
+                              {!isBurning && !burnError ? (
+                                <>
+                                  BURNER
+                                  <span className="grai-burn-estimate-sigma" aria-hidden="true">
+                                    Σ
+                                  </span>
+                                </>
+                              ) : null}
+                            </span>
+                            {!isBurning && !burnError ? (
+                              <span
+                                className={`grai-burn-estimate-value${
+                                  !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
+                                    ? ' is-placeholder'
+                                    : ''
+                                }`}
+                              >
+                                {burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—') ? (
+                                  isBurnEstimateLoading ? (
+                                    <span className="grai-estimate-spinner" aria-label="Calculating burn value estimate" />
+                                  ) : (
+                                    `~${burnTotalUsdLabel}`
+                                  )
+                                ) : (
+                                  '$0'
+                                )}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                       <div
                         className={`grai-burn-assets-rows-panel${isBurnAssetsRowsHidden ? '' : ' is-open'}`}
@@ -2079,6 +2141,7 @@ function GraiPage() {
       <aside className="grai-assets-chart-card" id="grai-assets-section" aria-label="GRAI assets composition">
           <div className="grai-assets-split">
             <div className="grai-assets-composition-block">
+            <Suspense fallback={null}>
             <div className="grai-donut-slot grai-donut-slot--supply" aria-label="GRAI total supply">
               <GraiNavDonut
                 slices={supplyCompositionRows}
@@ -2112,6 +2175,7 @@ function GraiPage() {
                 isLoading={vaultBalancesLoading || mintAssetsLoading}
               />
             </div>
+            </Suspense>
             <div className="grai-vault-balance-shell">
             <div className="grai-vault-balance-table-scroll">
             <div

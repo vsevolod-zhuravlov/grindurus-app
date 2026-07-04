@@ -29,3 +29,12 @@
     padding: 0 0.75rem 1.25rem;
   }
 }
+
+.App-main-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}

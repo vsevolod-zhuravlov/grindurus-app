@@ -8,7 +8,7 @@ import {
 import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { NATIVE_MINT } from './knownMints'
-import { fetchMintDecimals, fetchSeniorVaultPriceFeed, parseTokenAmount } from './onchain'
+import { fetchMintDecimals, fetchSeniorVaultPriceFeed, parseTokenAmount, confirmSignatureViaHttp } from './onchain'
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
@@ -131,6 +131,6 @@ export async function executeMint({
     skipPreflight: false,
     preflightCommitment: 'confirmed',
   })
-  await connection.confirmTransaction(signature, 'confirmed')
+  await confirmSignatureViaHttp(connection, signature, 'confirmed')
   return { signature, amount }
 }

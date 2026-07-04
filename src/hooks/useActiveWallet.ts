@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useEvmWallet } from './useEvmWallet'
 import { useSolanaWallet } from './useSolanaWallet'
 import { useWalletContext, ChainType } from '../providers/AppWalletProvider'
+import { evmChainIdToCaip2, solanaClusterToCaip2 } from '../wallet/caip2Network'
 
 export interface ActiveWalletState {
   isConnected: boolean
@@ -10,6 +11,7 @@ export interface ActiveWalletState {
   shortAddress: string
   chainType: ChainType
   networkName: string
+  networkCaip2: string | null
   disconnect: () => Promise<void>
 }
 
@@ -20,6 +22,7 @@ export function useActiveWallet(): ActiveWalletState {
 
   const activeWallet = useMemo((): ActiveWalletState => {
     if (selectedChainType === 'evm' && evmWallet.isConnected) {
+      const networkCaip2 = evmChainIdToCaip2(evmWallet.chainId)
       return {
         isConnected: true,
         isConnecting: evmWallet.isConnecting,
@@ -27,6 +30,7 @@ export function useActiveWallet(): ActiveWalletState {
         shortAddress: evmWallet.shortAddress,
         chainType: 'evm',
         networkName: evmWallet.chainName,
+        networkCaip2,
         disconnect: async () => {
           await Promise.resolve(evmWallet.disconnect())
           contextDisconnect()
@@ -35,6 +39,7 @@ export function useActiveWallet(): ActiveWalletState {
     }
 
     if (selectedChainType === 'solana' && solanaWallet.isConnected) {
+      const networkCaip2 = solanaClusterToCaip2(solanaWallet.cluster)
       return {
         isConnected: true,
         isConnecting: solanaWallet.isConnecting,
@@ -42,6 +47,7 @@ export function useActiveWallet(): ActiveWalletState {
         shortAddress: solanaWallet.shortAddress,
         chainType: 'solana',
         networkName: solanaWallet.clusterName,
+        networkCaip2,
         disconnect: async () => {
           await solanaWallet.disconnect()
           contextDisconnect()
@@ -56,6 +62,7 @@ export function useActiveWallet(): ActiveWalletState {
       shortAddress: '',
       chainType: null,
       networkName: '',
+      networkCaip2: null,
       disconnect: async () => {},
     }
   }, [selectedChainType, evmWallet, solanaWallet, contextDisconnect])

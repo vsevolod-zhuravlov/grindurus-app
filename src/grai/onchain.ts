@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js'
+import { Connection, PublicKey, type Commitment } from '@solana/web3.js'
 import { getAssociatedTokenAddress } from './pdas'
 
 /** Anchor SeniorVault.total_value (USD 9 decimals) at byte 77. */
@@ -136,4 +136,47 @@ export async function fetchWalletAssetBalance(
   } catch {
     return { raw: 0n, maxRaw: 0n, decimals }
   }
+}
+
+const SIGNATURE_CONFIRM_TIMEOUT_MS = 60_000
+const SIGNATURE_CONFIRM_POLL_MS = 1_000
+
+function isSignatureConfirmed(status: string | null | undefined, commitment: Commitment): boolean {
+  if (!status) return false
+  if (commitment === 'processed') {
+    return status === 'processed' || status === 'confirmed' || status === 'finalized'
+  }
+  if (commitment === 'confirmed') {
+    return status === 'confirmed' || status === 'finalized'
+  }
+  return status === 'finalized'
+}
+
+/** Poll RPC over HTTP — avoids WebSocket (broken for the local /solana-devnet-rpc Vite proxy). */
+export async function confirmSignatureViaHttp(
+  connection: Connection,
+  signature: string,
+  commitment: Commitment = 'confirmed',
+  timeoutMs = SIGNATURE_CONFIRM_TIMEOUT_MS,
+): Promise<void> {
+  const started = Date.now()
+
+  while (Date.now() - started < timeoutMs) {
+    const { value } = await connection.getSignatureStatuses([signature], {
+      searchTransactionHistory: false,
+    })
+    const status = value[0]
+
+    if (status?.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`)
+    }
+
+    if (isSignatureConfirmed(status?.confirmationStatus ?? null, commitment)) {
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, SIGNATURE_CONFIRM_POLL_MS))
+  }
+
+  throw new Error('Transaction confirmation timed out')
 }

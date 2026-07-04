@@ -3,8 +3,13 @@ import App from './App'
 import { AppWalletProvider } from './providers/AppWalletProvider'
 import { GraiDeploymentProvider } from './grai/GraiDeploymentProvider'
 import { GraiDataProvider } from './providers/GraiDataProvider'
-import './boss/bossLogsStream'
+import { stripBasePath } from './utils/appPaths'
 import './index.css'
+
+// Start fetching GRAI page chunk in parallel with the main bundle.
+if (stripBasePath(window.location.pathname) !== '/backtest') {
+  void import('./pages/GraiPage')
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <AppWalletProvider>

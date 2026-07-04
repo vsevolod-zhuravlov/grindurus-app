@@ -5,6 +5,7 @@ import { useActiveWallet } from '../hooks/useActiveWallet'
 import { useEvmWallet } from '../hooks/useEvmWallet'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { useWalletContext, type EvmChain } from '../providers/AppWalletProvider'
+import { evmChainIdToCaip2, solanaClusterToCaip2 } from '../wallet/caip2Network'
 import './WalletStyles.css'
 
 type WalletNetworkSelectProps = {
@@ -164,11 +165,16 @@ export function WalletNetworkSelect({
               aria-selected={evmWallet.chainId === chain.id}
               className={`wallet-network-select-item ${evmWallet.chainId === chain.id ? 'active' : ''}`}
               onClick={() => handleNetworkSelect(chain.id)}
+              title={evmChainIdToCaip2(chain.id)}
+              data-network-caip2={evmChainIdToCaip2(chain.id)}
             >
               <span className={`network-icon-svg ${chain.name.toLowerCase()}`}>
                 <EvmChainListIcon name={chain.name} />
               </span>
-              <span className="network-name">{chain.name}</span>
+              <span className="network-name-wrap">
+                <span className="network-name">{chain.name}</span>
+                <span className="network-caip2">{evmChainIdToCaip2(chain.id)}</span>
+              </span>
             </button>
           ))
         : null}
@@ -181,11 +187,16 @@ export function WalletNetworkSelect({
               aria-selected={solanaWallet.cluster === cluster.id}
               className={`wallet-network-select-item ${solanaWallet.cluster === cluster.id ? 'active' : ''}`}
               onClick={() => handleClusterSelect(cluster.id)}
+              title={solanaClusterToCaip2(cluster.id)}
+              data-network-caip2={solanaClusterToCaip2(cluster.id)}
             >
               <span className={`network-icon-svg ${cluster.id === 'devnet' ? 'solana-devnet' : 'solana'}`}>
                 <SolanaClusterListIcon />
               </span>
-              <span className="network-name">{cluster.name}</span>
+              <span className="network-name-wrap">
+                <span className="network-name">{cluster.name}</span>
+                <span className="network-caip2">{solanaClusterToCaip2(cluster.id)}</span>
+              </span>
             </button>
           ))
         : null}
@@ -206,6 +217,8 @@ export function WalletNetworkSelect({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-label={ariaLabel}
+        title={activeWallet.networkCaip2 ?? undefined}
+        data-network-caip2={activeWallet.networkCaip2 ?? undefined}
       >
         <span className="wallet-network-select-main">
           {activeWallet.chainType === 'evm' && currentEvmChain ? (

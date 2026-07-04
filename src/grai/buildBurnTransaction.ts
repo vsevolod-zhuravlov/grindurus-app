@@ -7,7 +7,7 @@ import {
 import type { GraiSolanaRuntime } from './deployments'
 import { graiStatePda } from './deployments'
 import { fetchGraiRegistryAssetMints } from './fetchAssets'
-import { fetchMintDecimals, parseTokenAmount } from './onchain'
+import { fetchMintDecimals, parseTokenAmount, confirmSignatureViaHttp, formatTokenBalance } from './onchain'
 import { getAssociatedTokenAddress, seniorVaultAtaPda, seniorVaultPda, TOKEN_PROGRAM_ID } from './pdas'
 import { createAssociatedTokenAccountIdempotentInstruction } from './splInstructions'
 
@@ -110,7 +110,7 @@ export async function executeBurn({
   signTransaction,
   connection,
   config,
-}: ExecuteBurnParams): Promise<{ signature: string; amount: bigint }> {
+}: ExecuteBurnParams): Promise<{ signature: string; amount: bigint; amountLabel: string }> {
   const decimals = await fetchMintDecimals(connection, config.graiMint)
   const graiAmount = parseTokenAmount(amountInput, decimals)
   const transaction = await buildBurnTransaction({ burner, graiAmount, connection, config })
@@ -119,6 +119,6 @@ export async function executeBurn({
     skipPreflight: false,
     preflightCommitment: 'confirmed',
   })
-  await connection.confirmTransaction(signature, 'confirmed')
-  return { signature, amount: graiAmount }
+  await confirmSignatureViaHttp(connection, signature, 'confirmed')
+  return { signature, amount: graiAmount, amountLabel: formatTokenBalance(graiAmount, decimals) }
 }

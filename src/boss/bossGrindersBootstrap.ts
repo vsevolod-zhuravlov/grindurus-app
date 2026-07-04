@@ -1,4 +1,5 @@
 import { bossRequestHeaders, resolveBossApiUrl } from './bossApi'
+import { resolveBossFetchUrl } from './bossProbe'
 import type { BossGrinderLogPayload, BossGrinderLogsSnapshot } from './types'
 
 export type BossGrindersResponse = {
@@ -176,7 +177,114 @@ export type BossGrindersBootstrapResult =
   | { ok: true; snapshot: BossGrinderLogsSnapshot }
   | { ok: false }
 
-export async function fetchBossGrindersSnapshot(): Promise<BossGrindersBootstrapResult> {
+export function bossScopeKey(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).hostname.replace(/^www\./, '')
+  } catch {
+    return baseUrl.replace(/\/$/, '')
+  }
+}
+
+function formatMultiBossGrinderName(bossLabel: string, grinderName: string | undefined, bossId: string): string {
+  const name = grinderName?.trim() || `Grinder ${bossId}`
+  return `${bossLabel} / ${name}`
+}
+
+export function scopeBossGrinderSnapshot(
+  baseUrl: string,
+  snapshot: BossGrinderLogsSnapshot,
+  options?: { prefixNames?: boolean; bossLabel?: string },
+): BossGrinderLogsSnapshot {
+  const scope = bossScopeKey(baseUrl)
+  const label = options?.bossLabel?.trim() || scope
+  const prefixNames = options?.prefixNames ?? false
+  const scoped: BossGrinderLogsSnapshot = {}
+
+  for (const [id, payload] of Object.entries(snapshot)) {
+    const key = `${scope}:${id}`
+    if (!payload || typeof payload !== 'object') {
+      scoped[key] = payload
+      continue
+    }
+    if (prefixNames && !('error' in payload && Object.keys(payload).length === 1)) {
+      const log = payload as BossGrinderLogPayload
+      scoped[key] = {
+        ...log,
+        grinder_name: formatMultiBossGrinderName(label, log.grinder_name, id),
+      }
+      continue
+    }
+    scoped[key] = payload
+  }
+
+  return scoped
+}
+
+export async function fetchBossGrindersSnapshotFromUrl(
+  baseUrl: string,
+  signal?: AbortSignal,
+): Promise<BossGrindersBootstrapResult> {
+  try {
+    const res = await fetch(resolveBossFetchUrl(baseUrl, '/grinders?verbose=0'), {
+      signal,
+      credentials: 'same-origin',
+      headers: bossRequestHeaders(),
+    })
+    if (!res.ok) return { ok: false }
+
+    const data = (await res.json()) as BossGrindersResponse
+    const snapshot = grindersResponseToLogsSnapshot(data)
+    return { ok: true, snapshot }
+  } catch {
+    return { ok: false }
+  }
+}
+
+export async function fetchBossGrindersFromUrls(
+  baseUrls: string[],
+  signal?: AbortSignal,
+): Promise<BossGrindersBootstrapResult> {
+  if (baseUrls.length === 0) return { ok: false }
+
+  const results = await Promise.all(
+    baseUrls.map(async (baseUrl) => ({
+      baseUrl,
+      result: await fetchBossGrindersSnapshotFromUrl(baseUrl, signal),
+    })),
+  )
+
+  let merged: BossGrinderLogsSnapshot = {}
+  let anyOk = false
+  const prefixNames = baseUrls.length > 1
+
+  for (const { baseUrl, result } of results) {
+    if (!result.ok) continue
+    anyOk = true
+    const scoped = prefixNames
+      ? scopeBossGrinderSnapshot(baseUrl, result.snapshot, { prefixNames: true })
+      : result.snapshot
+    merged = mergeBossLogsSnapshots(merged, scoped)
+  }
+
+  return anyOk ? { ok: true, snapshot: merged } : { ok: false }
+}
+
+export function resolveBossGrinderEndpointUrls(bossUrls: string[]): string[] {
+  if (bossUrls.length > 0) return bossUrls
+
+  const configured = import.meta.env.VITE_BOSS_API_URL?.trim()
+  if (configured) return [configured]
+
+  return []
+}
+
+export async function fetchBossGrindersSnapshot(
+  bossUrls: string[] = resolveBossGrinderEndpointUrls([]),
+): Promise<BossGrindersBootstrapResult> {
+  if (bossUrls.length > 0) {
+    return fetchBossGrindersFromUrls(bossUrls)
+  }
+
   try {
     const res = await fetch(resolveBossApiUrl('/grinders?verbose=0'), {
       credentials: 'same-origin',

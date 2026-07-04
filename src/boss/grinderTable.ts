@@ -205,11 +205,30 @@ export function mapBossLogToGrinderRow(
 
 function sortBossGrinderIds(ids: string[]): string[] {
   return [...ids].sort((a, b) => {
-    const na = Number.parseInt(a, 10)
-    const nb = Number.parseInt(b, 10)
+    const scopeA = a.includes(':') ? a.slice(0, a.lastIndexOf(':')) : ''
+    const scopeB = b.includes(':') ? b.slice(0, b.lastIndexOf(':')) : ''
+    if (scopeA !== scopeB) return scopeA.localeCompare(scopeB)
+
+    const idA = a.includes(':') ? a.slice(a.lastIndexOf(':') + 1) : a
+    const idB = b.includes(':') ? b.slice(b.lastIndexOf(':') + 1) : b
+    const na = Number.parseInt(idA, 10)
+    const nb = Number.parseInt(idB, 10)
     if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb
-    return a.localeCompare(b)
+    return idA.localeCompare(idB)
   })
+}
+
+export function summarizeGrinderTableRows(rows: GrinderTableRow[]): GrinderTableSummary {
+  const activeCount = rows.filter((row) => row.isActive).length
+  const tvlUsd = rows.reduce((sum, row) => sum + row.tvlUsd, 0)
+  const yieldUsd = rows.reduce((sum, row) => sum + row.yieldUsd, 0)
+
+  return {
+    activeCount,
+    totalCount: rows.length,
+    tvlUsd,
+    yieldUsd,
+  }
 }
 
 export function buildGrinderTableFromBossLogs(
@@ -219,17 +238,8 @@ export function buildGrinderTableFromBossLogs(
     mapBossLogToGrinderRow(bossId, snapshot[bossId]),
   )
 
-  const activeCount = rows.filter((row) => row.isActive).length
-  const tvlUsd = rows.reduce((sum, row) => sum + row.tvlUsd, 0)
-  const yieldUsd = rows.reduce((sum, row) => sum + row.yieldUsd, 0)
-
   return {
     rows,
-    summary: {
-      activeCount,
-      totalCount: rows.length,
-      tvlUsd,
-      yieldUsd,
-    },
+    summary: summarizeGrinderTableRows(rows),
   }
 }

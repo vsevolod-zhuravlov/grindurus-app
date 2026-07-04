@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { bossRemoteProxyPlugin } from './vite/bossRemoteProxy'
 
 const bossApiTarget =
   process.env.BOSS_API_TARGET ||
@@ -13,6 +14,10 @@ export default defineConfig({
   base: '/',
   plugins: [
     react(),
+    bossRemoteProxyPlugin({
+      // Local Traefik uses a self-signed cert; production boss hosts must validate TLS.
+      insecureTlsHosts: ['boss.localhost'],
+    }),
     nodePolyfills({
       include: ['buffer', 'crypto', 'stream'],
     }),
@@ -33,6 +38,7 @@ export default defineConfig({
         target: 'https://api.devnet.solana.com',
         changeOrigin: true,
         secure: false,
+        ws: true,
         rewrite: (path) => path.replace(/^\/solana-devnet-rpc/, ''),
       },
     },
@@ -54,6 +60,10 @@ export default defineConfig({
     },
   },
   build: {
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter((dep) => !dep.includes('evm-wallet') && !dep.includes('EvmProvider')),
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -61,6 +71,14 @@ export default defineConfig({
           if (id.includes('recharts') || id.includes('/d3-')) return 'recharts'
           if (id.includes('@xyflow')) return 'xyflow'
           if (id.includes('lightweight-charts')) return 'lightweight-charts'
+          if (
+            id.includes('/wagmi') ||
+            id.includes('@rainbow-me/rainbowkit') ||
+            id.includes('@walletconnect') ||
+            id.includes('metamask-sdk')
+          ) {
+            return 'evm-wallet'
+          }
         },
       },
     },
