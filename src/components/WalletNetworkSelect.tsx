@@ -86,12 +86,16 @@ export function WalletNetworkSelect({
   const updateMenuPosition = useCallback(() => {
     if (!isCompact || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
+    const minWidth = Math.max(rect.width, 184)
+    const isMobile = window.matchMedia('(max-width: 768px)').matches
+
     setMenuStyle({
       position: 'fixed',
       top: rect.bottom + 6,
-      right: window.innerWidth - rect.right,
-      left: 'auto',
-      minWidth: Math.max(rect.width, 184),
+      ...(isMobile
+        ? { right: window.innerWidth - rect.right, left: 'auto' }
+        : { left: rect.left, right: 'auto' }),
+      minWidth,
       zIndex: 120,
     })
   }, [isCompact])

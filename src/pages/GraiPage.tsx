@@ -501,6 +501,19 @@ function GraiGrinderCountValue({
   )
 }
 
+function GraiGrindersSummaryConnectButton({ onConnect }: { onConnect: () => void }) {
+  return (
+    <button
+      type="button"
+      className="connect-wallet-btn grai-grinders-network-connect-btn"
+      onClick={onConnect}
+    >
+      <WalletIcon />
+      Connect Wallet
+    </button>
+  )
+}
+
 const BALANCE_FIELD_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <ellipse cx="12" cy="7" rx="8" ry="3" />
@@ -1265,14 +1278,7 @@ function GraiPage() {
               {isGrinderNetworkConnected ? (
                 <WalletNetworkSelect variant="compact" ariaLabel="Select wallet network" />
               ) : (
-                <button
-                  type="button"
-                  className="connect-wallet-btn grai-grinders-network-connect-btn"
-                  onClick={openChainSelector}
-                >
-                  <WalletIcon />
-                  Connect Wallet
-                </button>
+                <GraiGrindersSummaryConnectButton onConnect={openChainSelector} />
               )}
             </span>
             <span role="columnheader" className="grai-grinders-group-general is-stacked grai-grinders-summary-general">
@@ -1283,7 +1289,9 @@ function GraiPage() {
                 />
                 <span className="grai-grinders-live-label grai-grinders-summary-mini-label">LIVE</span>
               </span>
-              {isBossGrinderLoading || isBossUnavailable ? (
+              {!isGrinderNetworkConnected ? (
+                <span className="grai-grinders-group-general-value">-/- GRINDERS</span>
+              ) : isBossGrinderLoading || isBossUnavailable ? (
                 <span className="grai-grinders-group-general-value grai-grinders-group-general-value--placeholder">
                   {isBossGrinderLoading ? '…' : '—'}
                 </span>
@@ -1308,7 +1316,11 @@ function GraiPage() {
                 </span>
                 UPTIME
               </GraiFieldInfoButton>
-              <span className="grai-grinders-group-title-value">{grinderUptimeLabel}</span>
+              {!isGrinderNetworkConnected ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              ) : (
+                <span className="grai-grinders-group-title-value">{grinderUptimeLabel}</span>
+              )}
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-tvl is-stacked" style={{ gridColumn: '4 / span 2' }}>
               <GraiFieldInfoButton
@@ -1322,7 +1334,11 @@ function GraiPage() {
                 </span>
                 VALUE LOCKED
               </GraiFieldInfoButton>
-              <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? grinderRows : []} />
+              {!isGrinderNetworkConnected ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              ) : (
+                <GraiGrinderTvlValue totalUsd={grinderTvlUsd} rows={isBossGrinderLive ? grinderRows : []} />
+              )}
             </span>
             <span role="columnheader" className="grai-grinders-group-title is-yield is-stacked" style={{ gridColumn: '6 / span 2' }}>
               <GraiFieldInfoButton
@@ -1336,7 +1352,11 @@ function GraiPage() {
                 </span>
                 YIELD
               </GraiFieldInfoButton>
-              <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? grinderRows : []} />
+              {!isGrinderNetworkConnected ? (
+                <span className="grai-grinders-group-title-value grai-grinders-group-title-value--placeholder">—</span>
+              ) : (
+                <GraiGrinderYieldValue totalUsd={grinderYieldUsd} rows={isBossGrinderLive ? grinderRows : []} />
+              )}
             </span>
           </div>
           <section
@@ -1351,7 +1371,7 @@ function GraiPage() {
               </p>
             ) : isBossUnavailable ? (
               <p className="grai-grinders-boss-status is-unavailable" role="status">
-                Boss API is unreachable. Grinder data is unavailable.
+                Boss API is unreachable. Grinders data is unavailable. Funds is saved by Custodies
               </p>
             ) : (
             <div
@@ -1536,36 +1556,45 @@ function GraiPage() {
                       />
                     </div>
                     <div className="grai-mint-amount-field">
-                      <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
-                        <span className="grai-field-label-icon" aria-hidden="true">
-                          {ACTION_SWITCH_ICONS.mint}
-                        </span>
-                        Deposit Amount
-                      </span>
-                      <div className="grai-mint-amount-row">
-                        <div className="grai-input-with-suffix has-max">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className="grai-input"
-                            placeholder="0"
-                            value={mintAmount}
-                            onChange={(e) => {
-                              setMintAmount(normalizeDecimalInput(e.target.value, assetDecimals ?? 9))
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="grai-input-max-btn"
-                            onClick={() => {
-                              if (maxAmount) setMintAmount(maxAmount)
-                            }}
-                            disabled={!maxAmount}
-                          >
-                            MAX
-                          </button>
+                      <div className="grai-mint-amount-row grai-mint-amount-row--with-asset-label">
+                        <div className="grai-mint-amount-input-col">
+                          <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
+                            <span className="grai-field-label-icon" aria-hidden="true">
+                              {ACTION_SWITCH_ICONS.mint}
+                            </span>
+                            Deposit Amount
+                          </span>
+                          <div className="grai-input-with-suffix has-max">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className="grai-input"
+                              placeholder="0"
+                              value={mintAmount}
+                              onChange={(e) => {
+                                setMintAmount(normalizeDecimalInput(e.target.value, assetDecimals ?? 9))
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="grai-input-max-btn"
+                              onClick={() => {
+                                if (maxAmount) setMintAmount(maxAmount)
+                              }}
+                              disabled={!maxAmount}
+                            >
+                              MAX
+                            </button>
+                          </div>
                         </div>
-                        <div className="grai-mint-asset-dropdown" ref={mintAssetMenuRef}>
+                        <div className="grai-mint-amount-asset-col">
+                          <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-asset-label">
+                            <span className="grai-field-label-icon" aria-hidden="true">
+                              {BALANCE_COLUMN_ICONS.assets}
+                            </span>
+                            Asset
+                          </span>
+                          <div className="grai-mint-asset-dropdown" ref={mintAssetMenuRef}>
                           <div className="grai-mint-asset-value">
                             <button
                               type="button"
@@ -1650,6 +1679,7 @@ function GraiPage() {
                               ))}
                             </div>
                           )}
+                          </div>
                         </div>
                       </div>
                       {!isMinting && !mintError && !(mintSignature && mintStatus === 'success') ? (
@@ -1866,7 +1896,7 @@ function GraiPage() {
                               decoding="async"
                             />
                           </span>
-                          GRAI
+                          <span className="grai-mint-asset-symbol">GRAI</span>
                           {solana?.graiMint && (
                             <a
                               href={solscanTokenUrl(graiMintAddress)}
