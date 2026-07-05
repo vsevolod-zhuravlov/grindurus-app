@@ -12,6 +12,7 @@ import type { GrinderCustodyState } from '../hooks/useGrindersCustodyBalances'
 import type { CustodyNetwork } from '../grai/custodyHoldings'
 import { yieldSplit } from '../grai/tokenomics'
 import { useGraiAllocate } from '../hooks/useGraiAllocate'
+import { shortenAddress } from '../utils/shortenAddress'
 import { useGraiAssets } from '../hooks/useGraiAssets'
 import { useGraiDistribute } from '../hooks/useGraiDistribute'
 import { useGraiVaultBalances } from '../hooks/useGraiVaultBalances'
@@ -110,11 +111,6 @@ const ALLOCATED_TABLE_ICON = (
     <path d="M16.7 7.7l-5.4 9.6" />
   </svg>
 )
-
-function shortenAddress(value: string, head = 6, tail = 6) {
-  if (value.length <= head + tail + 3) return value
-  return `${value.slice(0, head)}...${value.slice(-tail)}`
-}
 
 type CustodyHeldAssetRow = {
   asset: GraiAsset

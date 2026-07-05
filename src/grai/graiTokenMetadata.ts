@@ -1,3 +1,6 @@
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+import { stripTrailingSlash } from '../utils/urlUtils'
+
 export const DEFAULT_GRAI_METADATA_URL = 'https://grindurus.xyz/metadata.json'
 
 export type GraiTokenMetadata = {
@@ -30,7 +33,7 @@ function normalizeBossUrl(value: unknown): string | null {
   try {
     const url = new URL(trimmed)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-    return url.toString().replace(/\/$/, '')
+    return stripTrailingSlash(url.toString())
   } catch {
     return null
   }
@@ -50,8 +53,6 @@ export function parseGraiBossUrls(metadata: GraiTokenMetadata): string[] {
 
   return urls
 }
-
-import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 
 export async function fetchGraiTokenMetadata(signal?: AbortSignal): Promise<GraiTokenMetadata> {
   const response = await fetchWithTimeout(

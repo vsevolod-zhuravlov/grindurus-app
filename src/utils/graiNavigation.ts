@@ -11,7 +11,11 @@ export const GRAI_SECTION_IDS: Record<GraiSection, string> = {
   distribute: 'grai-manage-section',
 }
 
-const GRAI_SECTION_HASHES: GraiSection[] = ['mint', 'burn', 'assets', 'grinders', 'allocate', 'distribute']
+export const GRAI_SECTION_HASHES: GraiSection[] = ['mint', 'burn', 'assets', 'grinders', 'allocate', 'distribute']
+
+export function isManageSectionHash(hash: string): boolean {
+  return hash === 'allocate' || hash === 'distribute' || hash === 'manage'
+}
 
 export function readGraiSectionFromHash(): GraiSection | null {
   const hash = window.location.hash.slice(1)

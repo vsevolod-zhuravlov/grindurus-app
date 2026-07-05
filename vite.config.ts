@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import { bossRemoteProxyPlugin } from './vite/bossRemoteProxy'
+import { bossLocalProxyPlugin } from './vite/bossLocalProxy'
 
 const bossApiTarget =
   process.env.BOSS_API_TARGET ||
@@ -15,8 +16,12 @@ export default defineConfig({
   plugins: [
     react(),
     bossRemoteProxyPlugin({
-      // Local Traefik uses a self-signed cert; production boss hosts must validate TLS.
-      insecureTlsHosts: ['boss.localhost'],
+      // Local Traefik + dev/staging grindurus hosts may use self-signed certs in dev.
+      insecureTlsHosts: ['boss.localhost', 'grindurus.xyz'],
+    }),
+    bossLocalProxyPlugin({
+      target: bossApiTarget,
+      insecureTlsHosts: ['boss.localhost', 'grindurus.xyz'],
     }),
     nodePolyfills({
       include: ['buffer', 'crypto', 'stream'],

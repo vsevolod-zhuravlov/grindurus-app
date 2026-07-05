@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { bossLogsStream } from '../boss/bossLogsStream'
 import { buildGrinderTableFromBossLogs, type GrinderTableRow, type GrinderTableSummary } from '../boss/grinderTable'
+import type { BossGrinderAssetMeta } from '../boss/bossGrindersBootstrap'
 import type { BossGrinderLogsSnapshot } from '../boss/types'
 import { deferAfterPaint } from '../utils/deferAfterPaint'
 
@@ -17,6 +18,7 @@ type UseBossGrinderTableResult = {
 
 export function useBossGrinderTable(bossUrls: string[], metadataReady: boolean): UseBossGrinderTableResult {
   const [snapshot, setSnapshot] = useState<BossGrinderLogsSnapshot>({})
+  const [assetMeta, setAssetMeta] = useState<Record<string, BossGrinderAssetMeta>>({})
   const [isConnected, setIsConnected] = useState(false)
   const [isBootstrapped, setIsBootstrapped] = useState(false)
   const [isBossReachable, setIsBossReachable] = useState<boolean | null>(null)
@@ -38,8 +40,9 @@ export function useBossGrinderTable(bossUrls: string[], metadataReady: boolean):
           setIsConnected(true)
           setError(null)
         },
-        onMessage: (next) => {
+        onMessage: (next, nextAssetMeta) => {
           setSnapshot(next)
+          setAssetMeta(nextAssetMeta)
           setError(null)
         },
         onError: (message) => {
@@ -57,7 +60,7 @@ export function useBossGrinderTable(bossUrls: string[], metadataReady: boolean):
     }
   }, [bossUrls, metadataReady])
 
-  const { rows, summary } = useMemo(() => buildGrinderTableFromBossLogs(snapshot), [snapshot])
+  const { rows, summary } = useMemo(() => buildGrinderTableFromBossLogs(snapshot, assetMeta), [snapshot, assetMeta])
 
   const isLive = isBootstrapped && Object.keys(snapshot).length > 0
   const isBossUnavailable = metadataReady && isBootstrapped && !isLive && isBossReachable === false

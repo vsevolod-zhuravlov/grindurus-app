@@ -6,7 +6,7 @@ import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { WalletIcon } from './WalletIcon'
 import './WalletStyles.css'
 
-type TabType = 'evm' | 'solana' | 'movevm'
+type TabType = 'evm' | 'solana' | 'movevm' | 'ccxt'
 
 const EVM_LOADING_STEPS = [
   'Initializing EVM providers…',
@@ -16,10 +16,11 @@ const EVM_LOADING_STEPS = [
 
 function EvmWalletsLoadingPanel() {
   const [stepIndex, setStepIndex] = useState(0)
+  const progressPercent = Math.round(((stepIndex + 1) / EVM_LOADING_STEPS.length) * 100)
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setStepIndex((index) => (index + 1) % EVM_LOADING_STEPS.length)
+      setStepIndex((index) => Math.min(index + 1, EVM_LOADING_STEPS.length - 1))
     }, 1500)
 
     return () => window.clearInterval(id)
@@ -32,6 +33,23 @@ function EvmWalletsLoadingPanel() {
         <span className="wallet-evm-loading-text" key={stepIndex}>
           {EVM_LOADING_STEPS[stepIndex]}
         </span>
+      </div>
+
+      <div
+        className="wallet-evm-loading-progress"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progressPercent}
+        aria-label="EVM wallet stack loading progress"
+      >
+        <div className="wallet-evm-loading-progress-track">
+          <div
+            className="wallet-evm-loading-progress-fill"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <span className="wallet-evm-loading-progress-label">{progressPercent}%</span>
       </div>
 
       <div className="wallet-evm-loading-skeletons">
@@ -244,6 +262,24 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
             </div>
             MoveVM
           </button>
+          <button
+            type="button"
+            className={`wallet-tab ${activeTab === 'ccxt' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ccxt')}
+          >
+            <div className="wallet-tab-icon ccxt-icon">
+              <img
+                className="wallet-tab-icon-img"
+                src="https://avatars.githubusercontent.com/u/31901609?v=4"
+                alt=""
+                width={22}
+                height={22}
+                decoding="async"
+                draggable={false}
+              />
+            </div>
+            CCXT
+          </button>
         </div>
 
         <div className="wallet-modal-content">
@@ -354,6 +390,26 @@ export function ChainSelectorModal({ isOpen, onClose }: ChainSelectorModalProps)
                   <p>MoveVM wallets coming soon</p>
                   <p className="no-wallets-hint">Support for Aptos and Sui wallets is in development</p>
                 </div>
+              </div>
+            </div>
+
+            <div
+              className={`wallet-modal-panel${activeTab === 'ccxt' ? ' is-active' : ''}`}
+              role="tabpanel"
+              hidden={activeTab !== 'ccxt'}
+            >
+              <div className="wallet-options">
+                <button type="button" className="wallet-option-btn wallet-option-btn--ccxt">
+                  <img
+                    src="https://assets.coingecko.com/markets/images/52/small/binance.jpg"
+                    alt="Binance"
+                    className="wallet-icon"
+                  />
+                  <div className="wallet-option-info">
+                    <span className="wallet-option-name">Binance</span>
+                    <span className="wallet-option-desc">ccxt:binance</span>
+                  </div>
+                </button>
               </div>
             </div>
         </div>

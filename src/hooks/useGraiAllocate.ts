@@ -1,44 +1,17 @@
-import { useCallback, useState } from 'react'
-import { PublicKey, Transaction } from '@solana/web3.js'
+import { useCallback } from 'react'
+import { PublicKey } from '@solana/web3.js'
 import { executeAllocate } from '../grai/buildAllocateTransaction'
-import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
-import { useSolanaWallet } from './useSolanaWallet'
+import { useGraiTransaction, type GraiTransactionStatus } from './useGraiTransaction'
 
-export type GraiAllocateStatus = 'idle' | 'building' | 'signing' | 'confirming' | 'success' | 'error'
+export type GraiAllocateStatus = GraiTransactionStatus
 
 export function useGraiAllocate() {
-  const solanaWallet = useSolanaWallet()
-  const { connection, solana, clusterMismatch } = useGraiDeployment()
-  const [status, setStatus] = useState<GraiAllocateStatus>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [lastSignature, setLastSignature] = useState<string | null>(null)
+  const { run, reset, status, error, lastSignature, isPending } = useGraiTransaction()
 
   const allocate = useCallback(
     async (params: { assetMint: string; custodyWallet: string; amountInput: string }) => {
-      setError(null)
-      setLastSignature(null)
-
-      if (!solanaWallet.publicKey) {
-        solanaWallet.connect()
-        throw new Error('Connect a Solana wallet to allocate capital')
-      }
-
-      if (!solanaWallet.signTransaction) {
-        throw new Error('Connected wallet cannot sign transactions')
-      }
-
-      if (!connection || !solana) {
-        throw new Error('GRAI is not configured for this network')
-      }
-
-      if (clusterMismatch) {
-        throw new Error(`Switch your Solana wallet to ${solana.cluster} to allocate capital`)
-      }
-
       const amountInput = params.amountInput.trim()
-      if (!amountInput || amountInput === '0' || amountInput === '0.') {
-        throw new Error('Enter an amount to allocate')
-      }
+      const assetMint = new PublicKey(params.assetMint)
 
       let custodyWallet: PublicKey
       try {
@@ -47,46 +20,28 @@ export function useGraiAllocate() {
         throw new Error('Enter a valid custody wallet address')
       }
 
-      const authority = solanaWallet.publicKey
-      const assetMint = new PublicKey(params.assetMint)
+      const { signature } = await run({
+        connectMessage: 'Connect a Solana wallet to allocate capital',
+        clusterAction: 'allocate capital',
+        failureMessage: 'Allocate transaction failed',
+        amountInput: params.amountInput,
+        emptyAmountMessage: 'Enter an amount to allocate',
+        execute: ({ connection, solana, publicKey, signTransaction }) =>
+          executeAllocate({
+            connection,
+            config: solana,
+            authority: publicKey,
+            assetMint,
+            custodyWallet,
+            amountInput,
+            signTransaction,
+          }),
+      })
 
-      try {
-        setStatus('building')
-        const signTransaction = async (transaction: Transaction) => {
-          setStatus('signing')
-          return solanaWallet.signTransaction!(transaction)
-        }
-
-        setStatus('confirming')
-        const { signature } = await executeAllocate({
-          connection,
-          config: solana,
-          authority,
-          assetMint,
-          custodyWallet,
-          amountInput,
-          signTransaction,
-        })
-
-        setLastSignature(signature)
-        setStatus('success')
-        return signature
-      } catch (allocateError) {
-        const message =
-          allocateError instanceof Error ? allocateError.message : 'Allocate transaction failed'
-        setError(message)
-        setStatus('error')
-        throw allocateError
-      }
+      return signature
     },
-    [clusterMismatch, connection, solana, solanaWallet],
+    [run],
   )
-
-  const reset = useCallback(() => {
-    setStatus('idle')
-    setError(null)
-    setLastSignature(null)
-  }, [])
 
   return {
     allocate,
@@ -94,6 +49,6 @@ export function useGraiAllocate() {
     status,
     error,
     lastSignature,
-    isAllocating: status === 'building' || status === 'signing' || status === 'confirming',
+    isAllocating: isPending,
   }
 }

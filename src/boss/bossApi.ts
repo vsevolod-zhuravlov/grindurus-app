@@ -1,9 +1,9 @@
+import { joinUrl } from '../utils/urlUtils'
+
 export function resolveBossApiUrl(path: string): string {
   const configured = import.meta.env.VITE_BOSS_API_URL?.trim()
   const base = configured || '/api'
-  const normalizedBase = base.replace(/\/$/, '')
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return `${normalizedBase}${normalizedPath}`
+  return joinUrl(base, path)
 }
 
 export function bossRequestHeaders(): Record<string, string> {

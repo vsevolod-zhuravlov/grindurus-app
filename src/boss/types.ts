@@ -21,4 +21,18 @@ export type BossGrinderLogPayload = {
   error?: string
 }
 
+export type BossMetaAuth = {
+  'x-boss-key'?: boolean
+  'x-grind-key'?: boolean
+}
+
+export type BossLogsMeta = {
+  name?: string
+  grinders_max?: number
+  auth?: BossMetaAuth
+}
+
+/** Reserved key in `/logs` SSE payloads — boss name, limits, auth flags. */
+export const BOSS_LOGS_META_KEY = '__boss__'
+
 export type BossGrinderLogsSnapshot = Record<string, BossGrinderLogPayload | { error?: string }>

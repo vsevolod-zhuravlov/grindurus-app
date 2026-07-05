@@ -1,62 +1,112 @@
-import { useEffect, useState } from 'react'
-import { type BossEndpointProbe, probeBossEndpoints } from '../boss/bossProbe'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type BossEndpointProbe,
+  applyBossEndpointProbeError,
+  clearBossEndpointProbeCache,
+  getBossEndpointProbeCache,
+  listBossEndpointProbeCacheKeys,
+  probeBossEndpoint,
+  setBossEndpointProbeLoading,
+  setBossEndpointProbeReady,
+  subscribeBossEndpointProbeCache,
+} from '../boss/bossProbe'
+import { normalizeBossEndpointUrl } from './useCustomBossEndpoints'
 
-type BossEndpointProbesState =
-  | { status: 'idle'; rows: BossEndpointProbe[] }
-  | { status: 'loading'; rows: BossEndpointProbe[] }
-  | { status: 'ready'; rows: BossEndpointProbe[] }
-
-function loadingRows(bossUrls: string[]): BossEndpointProbe[] {
-  return bossUrls.map((uri) => ({
+function idleRow(uri: string): BossEndpointProbe {
+  return {
     uri,
-    status: 'loading',
-    health: '…',
-    metaName: '…',
-    grindersMax: '…',
-    authLabel: '…',
-  }))
+    status: 'idle',
+    metaName: '—',
+    grindersMax: '—',
+    authLabel: '—',
+  }
 }
 
-export function useBossEndpointProbes(bossUrls: string[], metadataReady: boolean): BossEndpointProbesState {
-  const [state, setState] = useState<BossEndpointProbesState>({ status: 'idle', rows: [] })
+export { clearBossEndpointProbeCache }
+
+export function useBossEndpointProbes(bossUrls: string[], enabled: boolean) {
+  const [cacheVersion, setCacheVersion] = useState(0)
+  const inflightRef = useRef<Map<string, AbortController>>(new Map())
+  const bossUrlsKey = useMemo(() => bossUrls.join('\0'), [bossUrls])
+
+  useEffect(() => subscribeBossEndpointProbeCache(() => setCacheVersion((version) => version + 1)), [])
 
   useEffect(() => {
-    if (!metadataReady) {
-      setState({ status: 'idle', rows: [] })
-      return
+    if (!enabled) return
+
+    const activeUrls = new Set(bossUrls)
+
+    for (const cachedUri of listBossEndpointProbeCacheKeys()) {
+      if (!activeUrls.has(cachedUri)) {
+        clearBossEndpointProbeCache(cachedUri)
+      }
     }
 
-    if (bossUrls.length === 0) {
-      setState({ status: 'ready', rows: [] })
-      return
+    for (const [uri, controller] of inflightRef.current.entries()) {
+      if (!activeUrls.has(uri)) {
+        controller.abort()
+        inflightRef.current.delete(uri)
+      }
     }
+  }, [bossUrls, bossUrlsKey, enabled])
 
-    const controller = new AbortController()
-    setState({ status: 'loading', rows: loadingRows(bossUrls) })
+  useEffect(
+    () => () => {
+      for (const controller of inflightRef.current.values()) {
+        controller.abort()
+      }
+      inflightRef.current.clear()
+    },
+    [],
+  )
 
-    void probeBossEndpoints(bossUrls, controller.signal)
-      .then((rows) => {
-        setState({ status: 'ready', rows })
-      })
-      .catch((error: unknown) => {
-        if ((error as DOMException)?.name === 'AbortError') return
-        const message = error instanceof Error ? error.message : 'Failed to probe boss endpoints'
-        setState({
-          status: 'ready',
-          rows: bossUrls.map((uri) => ({
-            uri,
-            status: 'error',
-            health: '—',
-            metaName: '—',
-            grindersMax: '—',
-            authLabel: '—',
-            error: message,
-          })),
+  const probeUri = useCallback(
+    (uri: string) => {
+      if (!enabled) return
+
+      inflightRef.current.get(uri)?.abort()
+
+      const controller = new AbortController()
+      inflightRef.current.set(uri, controller)
+      setBossEndpointProbeLoading(uri)
+
+      void probeBossEndpoint(uri, controller.signal)
+        .then((result) => {
+          if (controller.signal.aborted) return
+          setBossEndpointProbeReady(uri, result)
         })
-      })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          const message = error instanceof Error ? error.message : 'Boss unreachable'
+          applyBossEndpointProbeError(uri, message)
+        })
+        .finally(() => {
+          if (inflightRef.current.get(uri) === controller) {
+            inflightRef.current.delete(uri)
+          }
+        })
+    },
+    [enabled],
+  )
 
-    return () => controller.abort()
-  }, [bossUrls, metadataReady])
+  const abortProbeUri = useCallback((uri: string) => {
+    const normalized = normalizeBossEndpointUrl(uri)
+    inflightRef.current.get(uri)?.abort()
+    inflightRef.current.delete(uri)
+    if (normalized) clearBossEndpointProbeCache(normalized)
+  }, [])
 
-  return state
+  const rows = useMemo(
+    () => bossUrls.map((uri) => getBossEndpointProbeCache(uri) ?? idleRow(uri)),
+    [bossUrls, bossUrlsKey, cacheVersion],
+  )
+
+  const isLoading = enabled && rows.some((row) => row.status === 'loading')
+
+  return {
+    rows: enabled ? rows : [],
+    probeUri,
+    abortProbeUri,
+    isLoading,
+  }
 }

@@ -1,10 +1,13 @@
 import { bossRequestHeaders, resolveBossApiUrl } from './bossApi'
-import { resolveBossFetchUrl } from './bossProbe'
-import type { BossGrinderLogPayload, BossGrinderLogsSnapshot } from './types'
+import { applyBossEndpointProbeFromMeta, applyBossEndpointProbeError, resolveBossFetchUrl } from './bossProbe'
+import { readNumber } from './readNumber'
+import { stripTrailingSlash } from '../utils/urlUtils'
+import { BOSS_LOGS_META_KEY, type BossGrinderLogPayload, type BossGrinderLogsSnapshot, type BossLogsMeta, type BossMetaAuth } from './types'
 
 export type BossGrindersResponse = {
   name?: string
   grinders_max?: number
+  auth?: BossMetaAuth
   grinders?: Record<string, BossGrinderRecord>
 }
 
@@ -27,6 +30,7 @@ type BossGrinderRecord = BossGrinderLogPayload & {
   allocated?: BossBalanceBucket
   loans?: BossBalanceBucket
   adapter_data?: {
+    address?: string
     base_asset?: string
     quote_asset?: string
     spot_price?: number
@@ -37,13 +41,126 @@ type BossGrinderRecord = BossGrinderLogPayload & {
   network?: string
 }
 
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
+export type BossGrinderAssetMeta = {
+  base_asset?: string
+  quote_asset?: string
+}
+
+function readAssetSymbol(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed || undefined
+}
+
+export function resolveGrinderAssetSymbols(record: BossGrinderRecord): {
+  baseAsset?: string
+  quoteAsset?: string
+} {
+  const adapter = record.adapter_data
+  return {
+    baseAsset: readAssetSymbol(record.base_asset) ?? readAssetSymbol(adapter?.base_asset),
+    quoteAsset: readAssetSymbol(record.quote_asset) ?? readAssetSymbol(adapter?.quote_asset),
   }
-  return undefined
+}
+
+export function extractGrinderAssetMetaFromGrindersResponse(
+  response: BossGrindersResponse,
+): Record<string, BossGrinderAssetMeta> {
+  const meta: Record<string, BossGrinderAssetMeta> = {}
+  for (const [key, record] of Object.entries(response.grinders ?? {})) {
+    if (!record || typeof record !== 'object') continue
+    const bossId = String(record.grinder_id ?? record.id ?? key)
+    const symbols = resolveGrinderAssetSymbols(record)
+    if (!symbols.baseAsset && !symbols.quoteAsset) continue
+    meta[bossId] = {
+      ...(symbols.baseAsset ? { base_asset: symbols.baseAsset } : {}),
+      ...(symbols.quoteAsset ? { quote_asset: symbols.quoteAsset } : {}),
+    }
+  }
+  return meta
+}
+
+export function scopeBossGrinderAssetMeta(
+  baseUrl: string,
+  meta: Record<string, BossGrinderAssetMeta>,
+): Record<string, BossGrinderAssetMeta> {
+  const scope = bossScopeKey(baseUrl)
+  const scoped: Record<string, BossGrinderAssetMeta> = {}
+  for (const [id, entry] of Object.entries(meta)) {
+    scoped[`${scope}:${id}`] = entry
+  }
+  return scoped
+}
+
+export function mergeGrinderAssetMeta(
+  previous: Record<string, BossGrinderAssetMeta>,
+  incoming: Record<string, BossGrinderAssetMeta>,
+): Record<string, BossGrinderAssetMeta> {
+  return { ...previous, ...incoming }
+}
+
+function applyAssetMetaToLogPayload(
+  payload: BossGrinderLogPayload | { error?: string },
+  meta?: BossGrinderAssetMeta,
+): BossGrinderLogPayload | { error?: string } {
+  if (!meta || !payload || typeof payload !== 'object' || ('error' in payload && Object.keys(payload).length === 1)) {
+    return payload
+  }
+
+  const log = payload as BossGrinderLogPayload
+  return {
+    ...log,
+    base_asset: readAssetSymbol(log.base_asset) ?? meta.base_asset ?? log.base_asset,
+    quote_asset: readAssetSymbol(log.quote_asset) ?? meta.quote_asset ?? log.quote_asset,
+  }
+}
+
+export function resolveLogAssetSymbols(
+  log: Pick<BossGrinderLogPayload, 'base_asset' | 'quote_asset'>,
+  assetMeta?: BossGrinderAssetMeta,
+): { baseAsset?: string; quoteAsset?: string } {
+  return {
+    baseAsset: readAssetSymbol(log.base_asset) ?? assetMeta?.base_asset,
+    quoteAsset: readAssetSymbol(log.quote_asset) ?? assetMeta?.quote_asset,
+  }
+}
+
+export function applyGrinderAssetMetaToSnapshot(
+  snapshot: BossGrinderLogsSnapshot,
+  assetMeta: Record<string, BossGrinderAssetMeta>,
+): BossGrinderLogsSnapshot {
+  if (Object.keys(assetMeta).length === 0) return snapshot
+
+  const enriched: BossGrinderLogsSnapshot = { ...snapshot }
+  const bossIds = new Set([
+    ...Object.keys(enriched).filter((id) => id !== BOSS_LOGS_META_KEY),
+    ...Object.keys(assetMeta),
+  ])
+
+  for (const bossId of bossIds) {
+    const payload = enriched[bossId]
+    if (!payload || typeof payload !== 'object') continue
+    enriched[bossId] = applyAssetMetaToLogPayload(payload, assetMeta[bossId])
+  }
+  return enriched
+}
+
+function preserveLogAssetFields(
+  previous: BossGrinderLogPayload | { error?: string },
+  incoming: BossGrinderLogPayload | { error?: string },
+): BossGrinderLogPayload | { error?: string } {
+  const merged = { ...previous, ...incoming } as BossGrinderLogPayload
+  const prevLog = previous as BossGrinderLogPayload
+  const nextLog = incoming as BossGrinderLogPayload
+
+  if (!readAssetSymbol(nextLog.base_asset) && readAssetSymbol(prevLog.base_asset)) {
+    merged.base_asset = prevLog.base_asset
+  }
+  if (!readAssetSymbol(nextLog.quote_asset) && readAssetSymbol(prevLog.quote_asset)) {
+    merged.quote_asset = prevLog.quote_asset
+  }
+
+  return merged
 }
 
 function readBucketSide(bucket: BossBalanceBucket | undefined, side: 'quote' | 'base'): number | undefined {
@@ -104,6 +221,7 @@ export function mergeBossLogsSnapshots(
 
   const merged: BossGrinderLogsSnapshot = { ...previous }
   for (const [bossId, payload] of Object.entries(incoming)) {
+    if (bossId === BOSS_LOGS_META_KEY) continue
     if (!payload || typeof payload !== 'object') continue
     const prev = merged[bossId]
     if (!prev) {
@@ -111,10 +229,10 @@ export function mergeBossLogsSnapshots(
       continue
     }
     if (isErrorOnlyPayload(payload) && hasGrinderData(prev)) {
-      merged[bossId] = { ...prev, ...payload }
+      merged[bossId] = preserveLogAssetFields(prev, payload)
       continue
     }
-    merged[bossId] = { ...prev, ...payload }
+    merged[bossId] = preserveLogAssetFields(prev, payload)
   }
   return merged
 }
@@ -123,13 +241,12 @@ function recordToLogPayload(bossId: string, record: BossGrinderRecord): BossGrin
   const error = formatBossError(record.error ?? record.detail)
   if (error && !hasGrinderData(record)) return { error }
 
-  const baseAsset = record.base_asset ?? record.adapter_data?.base_asset
-  const quoteAsset = record.quote_asset ?? record.adapter_data?.quote_asset
+  const { baseAsset, quoteAsset } = resolveGrinderAssetSymbols(record)
 
   return {
     grinder_id: record.grinder_id ?? record.id ?? bossId,
     grinder_name: record.grinder_name ?? record.name,
-    grinder_address: record.grinder_address,
+    grinder_address: record.grinder_address ?? record.adapter_data?.address,
     base_asset: baseAsset,
     quote_asset: quoteAsset,
     status: record.status,
@@ -173,15 +290,32 @@ export function grindersResponseToLogsSnapshot(response: BossGrindersResponse): 
   return snapshot
 }
 
+export function splitBossLogsSnapshot(
+  snapshot: BossGrinderLogsSnapshot & Record<string, unknown>,
+  baseUrl?: string,
+): { grinderSnapshot: BossGrinderLogsSnapshot; bossMeta?: BossLogsMeta } {
+  const rawMeta = snapshot[BOSS_LOGS_META_KEY]
+  const grinderSnapshot = { ...snapshot } as BossGrinderLogsSnapshot & Record<string, unknown>
+  delete grinderSnapshot[BOSS_LOGS_META_KEY]
+
+  let bossMeta: BossLogsMeta | undefined
+  if (rawMeta && typeof rawMeta === 'object' && ('name' in rawMeta || 'grinders_max' in rawMeta || 'auth' in rawMeta)) {
+    bossMeta = rawMeta as BossLogsMeta
+    if (baseUrl) applyBossEndpointProbeFromMeta(baseUrl, bossMeta)
+  }
+
+  return { grinderSnapshot, bossMeta }
+}
+
 export type BossGrindersBootstrapResult =
-  | { ok: true; snapshot: BossGrinderLogsSnapshot }
+  | { ok: true; snapshot: BossGrinderLogsSnapshot; assetMeta: Record<string, BossGrinderAssetMeta> }
   | { ok: false }
 
 export function bossScopeKey(baseUrl: string): string {
   try {
     return new URL(baseUrl).hostname.replace(/^www\./, '')
   } catch {
-    return baseUrl.replace(/\/$/, '')
+    return stripTrailingSlash(baseUrl)
   }
 }
 
@@ -201,6 +335,7 @@ export function scopeBossGrinderSnapshot(
   const scoped: BossGrinderLogsSnapshot = {}
 
   for (const [id, payload] of Object.entries(snapshot)) {
+    if (id === BOSS_LOGS_META_KEY) continue
     const key = `${scope}:${id}`
     if (!payload || typeof payload !== 'object') {
       scoped[key] = payload
@@ -230,12 +365,18 @@ export async function fetchBossGrindersSnapshotFromUrl(
       credentials: 'same-origin',
       headers: bossRequestHeaders(),
     })
-    if (!res.ok) return { ok: false }
+    if (!res.ok) {
+      applyBossEndpointProbeError(baseUrl, `HTTP ${res.status}`)
+      return { ok: false }
+    }
 
     const data = (await res.json()) as BossGrindersResponse
+    applyBossEndpointProbeFromMeta(baseUrl, data)
     const snapshot = grindersResponseToLogsSnapshot(data)
-    return { ok: true, snapshot }
+    const assetMeta = extractGrinderAssetMetaFromGrindersResponse(data)
+    return { ok: true, snapshot, assetMeta }
   } catch {
+    applyBossEndpointProbeError(baseUrl, 'Boss unreachable')
     return { ok: false }
   }
 }
@@ -254,6 +395,7 @@ export async function fetchBossGrindersFromUrls(
   )
 
   let merged: BossGrinderLogsSnapshot = {}
+  let mergedAssetMeta: Record<string, BossGrinderAssetMeta> = {}
   let anyOk = false
   const prefixNames = baseUrls.length > 1
 
@@ -263,10 +405,14 @@ export async function fetchBossGrindersFromUrls(
     const scoped = prefixNames
       ? scopeBossGrinderSnapshot(baseUrl, result.snapshot, { prefixNames: true })
       : result.snapshot
+    const scopedAssetMeta = prefixNames
+      ? scopeBossGrinderAssetMeta(baseUrl, result.assetMeta)
+      : result.assetMeta
     merged = mergeBossLogsSnapshots(merged, scoped)
+    mergedAssetMeta = mergeGrinderAssetMeta(mergedAssetMeta, scopedAssetMeta)
   }
 
-  return anyOk ? { ok: true, snapshot: merged } : { ok: false }
+  return anyOk ? { ok: true, snapshot: merged, assetMeta: mergedAssetMeta } : { ok: false }
 }
 
 export function resolveBossGrinderEndpointUrls(bossUrls: string[]): string[] {
@@ -294,7 +440,8 @@ export async function fetchBossGrindersSnapshot(
 
     const data = (await res.json()) as BossGrindersResponse
     const snapshot = grindersResponseToLogsSnapshot(data)
-    return { ok: true, snapshot }
+    const assetMeta = extractGrinderAssetMetaFromGrindersResponse(data)
+    return { ok: true, snapshot, assetMeta }
   } catch {
     return { ok: false }
   }

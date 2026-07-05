@@ -1,15 +1,9 @@
 import { bossRequestHeaders } from './bossApi'
 import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+import { joinUrl } from '../utils/urlUtils'
+import type { BossLogsMeta, BossMetaAuth } from './types'
 
-export type BossHealthResponse = {
-  status?: string
-  role?: string
-}
-
-export type BossMetaAuth = {
-  'x-boss-key'?: boolean
-  'x-grind-key'?: boolean
-}
+export type { BossMetaAuth, BossLogsMeta }
 
 export type BossMetaResponse = {
   boss_name?: string
@@ -34,18 +28,49 @@ export type BossAuthConfigResponse = BossMetaAuth & {
 
 export type BossEndpointProbe = {
   uri: string
-  status: 'loading' | 'ready' | 'error'
-  health: string
+  status: 'idle' | 'loading' | 'ready' | 'error'
   metaName: string
   grindersMax: string
   authLabel: string
   error?: string
 }
 
+const probeCache = new Map<string, BossEndpointProbe>()
+const probeListeners = new Set<() => void>()
+
+function notifyProbeCacheChanged(): void {
+  for (const listener of probeListeners) {
+    listener()
+  }
+}
+
+export function subscribeBossEndpointProbeCache(listener: () => void): () => void {
+  probeListeners.add(listener)
+  return () => probeListeners.delete(listener)
+}
+
+export function getBossEndpointProbeCache(uri: string): BossEndpointProbe | undefined {
+  return probeCache.get(uri)
+}
+
+export function listBossEndpointProbeCacheKeys(): string[] {
+  return [...probeCache.keys()]
+}
+
+export function clearBossEndpointProbeCacheEntry(uri: string): void {
+  if (probeCache.delete(uri)) {
+    notifyProbeCacheChanged()
+  }
+}
+
 function joinBossUrl(baseUrl: string, path: string): string {
-  const normalizedBase = baseUrl.replace(/\/$/, '')
+  return joinUrl(baseUrl, path)
+}
+
+/** Boss UI is served at `/`; FastAPI is reached via Traefik at `/api/*`. */
+function resolveBossApiPath(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return `${normalizedBase}${normalizedPath}`
+  return normalizedPath.startsWith('/api') ? normalizedPath : `/api${normalizedPath}`
 }
 
 const LOCAL_INSECURE_TLS_HOSTS = ['boss.localhost']
@@ -64,16 +89,16 @@ function isLocalDevBoss(baseUrl: string): boolean {
 
 /** Dev: same-origin proxy. Prod: direct URL (requires boss CORS). */
 export function resolveBossFetchUrl(baseUrl: string, path: string): string {
-  const absolute = joinBossUrl(baseUrl, path)
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
   if (import.meta.env.DEV) {
-    // Local Traefik cert: use Vite `/api` proxy (secure: false) instead of boss-remote.
     if (isLocalDevBoss(baseUrl)) {
-      const normalizedPath = path.startsWith('/') ? path : `/${path}`
-      return `/api${normalizedPath}`
+      return `/boss-local${normalizedPath}`
     }
+    const apiPath = resolveBossApiPath(path)
+    const absolute = joinBossUrl(baseUrl, apiPath)
     return `/boss-remote?target=${encodeURIComponent(absolute)}`
   }
-  return absolute
+  return joinBossUrl(baseUrl, resolveBossApiPath(path))
 }
 
 async function fetchBossJson<T>(baseUrl: string, path: string, signal?: AbortSignal): Promise<T> {
@@ -104,7 +129,7 @@ export function formatBossAuthLabel(config: BossAuthConfigResponse | BossMetaAut
   return labels.length > 0 ? labels.join(', ') : 'Public'
 }
 
-function formatBossAuthFromMeta(meta: BossMetaResponse | BossInfoResponse | null | undefined): string {
+function formatBossAuthFromMeta(meta: BossMetaResponse | BossInfoResponse | BossLogsMeta | null | undefined): string {
   if (!meta) return 'Public'
   if ('auth' in meta && meta.auth) return formatBossAuthLabel(meta.auth)
   if ('x_boss_key' in meta || 'x_grind_key' in meta) {
@@ -116,64 +141,79 @@ function formatBossAuthFromMeta(meta: BossMetaResponse | BossInfoResponse | null
   return 'Public'
 }
 
-export function formatBossHealthLabel(health: BossHealthResponse | null | undefined): string {
-  const status = health?.status?.trim()
-  if (!status) return '—'
-  const role = health?.role?.trim()
-  return role ? `${status} (${role})` : status
-}
-
-export function formatBossMetaName(meta: BossMetaResponse | BossInfoResponse | null | undefined): string {
+export function formatBossMetaName(meta: BossMetaResponse | BossInfoResponse | BossLogsMeta | null | undefined): string {
   if (!meta) return '—'
-  const bossName = meta.boss_name?.trim() || ('name' in meta ? meta.name?.trim() : undefined)
+  const bossName =
+    ('boss_name' in meta && meta.boss_name?.trim()) ||
+    ('name' in meta && meta.name?.trim()) ||
+    undefined
   return bossName || '—'
 }
 
-export function formatBossGrindersMax(meta: BossMetaResponse | BossInfoResponse | null | undefined): string {
+export function formatBossGrindersMax(meta: BossMetaResponse | BossInfoResponse | BossLogsMeta | null | undefined): string {
   if (!meta || meta.grinders_max == null) return '—'
   return String(meta.grinders_max)
 }
 
-async function fetchBossMeta(baseUrl: string, signal?: AbortSignal): Promise<BossMetaResponse | BossInfoResponse> {
-  try {
-    return await fetchBossJson<BossMetaResponse>(baseUrl, '/meta', signal)
-  } catch {
-    return fetchBossJson<BossInfoResponse>(baseUrl, '/info', signal)
+export function endpointMetaToProbeFields(
+  meta: BossLogsMeta | null | undefined,
+): Omit<BossEndpointProbe, 'uri' | 'status'> {
+  return {
+    metaName: formatBossMetaName(meta),
+    grindersMax: formatBossGrindersMax(meta),
+    authLabel: formatBossAuthFromMeta(meta),
   }
 }
 
+type BossGrindersProbeResponse = BossLogsMeta & {
+  grinders?: Record<string, unknown>
+}
+
+export function applyBossEndpointProbeFromMeta(uri: string, meta: BossLogsMeta | null | undefined): void {
+  if (!meta) return
+  probeCache.set(uri, {
+    uri,
+    status: 'ready',
+    ...endpointMetaToProbeFields(meta),
+  })
+  notifyProbeCacheChanged()
+}
+
+export function clearBossEndpointProbeCache(uri?: string): void {
+  if (!uri) {
+    if (probeCache.size > 0) {
+      probeCache.clear()
+      notifyProbeCacheChanged()
+    }
+    return
+  }
+
+  clearBossEndpointProbeCacheEntry(uri)
+}
+
+export function setBossEndpointProbeLoading(uri: string): void {
+  probeCache.set(uri, {
+    uri,
+    status: 'loading',
+    metaName: '…',
+    grindersMax: '…',
+    authLabel: '…',
+  })
+  notifyProbeCacheChanged()
+}
+
+export function setBossEndpointProbeReady(uri: string, fields: Omit<BossEndpointProbe, 'uri' | 'status'>): void {
+  probeCache.set(uri, {
+    uri,
+    status: 'ready',
+    ...fields,
+  })
+  notifyProbeCacheChanged()
+}
+
 export async function probeBossEndpoint(baseUrl: string, signal?: AbortSignal): Promise<Omit<BossEndpointProbe, 'uri' | 'status'>> {
-  const [healthResult, metaResult] = await Promise.allSettled([
-    fetchBossJson<BossHealthResponse>(baseUrl, '/health', signal),
-    fetchBossMeta(baseUrl, signal),
-  ])
-
-  const errors: string[] = []
-
-  if (healthResult.status === 'rejected') {
-    errors.push('health')
-  }
-  if (metaResult.status === 'rejected') {
-    errors.push('meta')
-  }
-
-  const health = healthResult.status === 'fulfilled' ? formatBossHealthLabel(healthResult.value) : '—'
-  const meta = metaResult.status === 'fulfilled' ? metaResult.value : null
-  const metaName = formatBossMetaName(meta)
-  const grindersMax = formatBossGrindersMax(meta)
-  const authLabel = formatBossAuthFromMeta(meta)
-
-  if (errors.length === 2) {
-    throw new Error(`Boss unreachable (${errors.join(', ')})`)
-  }
-
-  return {
-    health,
-    metaName,
-    grindersMax,
-    authLabel,
-    ...(errors.length > 0 ? { error: `Partial: ${errors.join(', ')} failed` } : {}),
-  }
+  const data = await fetchBossJson<BossGrindersProbeResponse>(baseUrl, '/grinders?verbose=0', signal)
+  return endpointMetaToProbeFields(data)
 }
 
 export async function probeBossEndpoints(baseUrls: string[], signal?: AbortSignal): Promise<BossEndpointProbe[]> {
@@ -191,7 +231,6 @@ export async function probeBossEndpoints(baseUrls: string[], signal?: AbortSigna
         return {
           uri,
           status: 'error' as const,
-          health: '—',
           metaName: '—',
           grindersMax: '—',
           authLabel: '—',
@@ -202,4 +241,16 @@ export async function probeBossEndpoints(baseUrls: string[], signal?: AbortSigna
   )
 
   return probes
+}
+
+export function applyBossEndpointProbeError(uri: string, message: string): void {
+  probeCache.set(uri, {
+    uri,
+    status: 'error',
+    metaName: '—',
+    grindersMax: '—',
+    authLabel: '—',
+    error: message,
+  })
+  notifyProbeCacheChanged()
 }

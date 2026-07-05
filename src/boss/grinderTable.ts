@@ -1,6 +1,10 @@
+import type { BossGrinderAssetMeta } from './bossGrindersBootstrap'
+import { resolveLogAssetSymbols } from './bossGrindersBootstrap'
 import type { GrinderConfig } from '../grai/grinders'
 import { formatRelativeTime } from '../utils/formatRelativeTime'
+import { readNumber } from './readNumber'
 import type { BossGrinderLogPayload, BossGrinderLogsSnapshot } from './types'
+import { BOSS_LOGS_META_KEY } from './types'
 
 export function isGrinderStatusLive(status?: string): boolean {
   const normalized = status?.trim().toUpperCase()
@@ -53,16 +57,7 @@ export function resolveBossGrinderId(config: GrinderConfig, index: number): stri
   return String(index + 1)
 }
 
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return undefined
-}
-
-function formatTokenAmount(value: number | undefined, asset: string): string {
+function formatTokenAmount(value: number | undefined, asset: string | undefined): string {
   if (value == null || !Number.isFinite(value)) return '—'
   const abs = Math.abs(value)
   const maximumFractionDigits = abs >= 1000 ? 0 : abs >= 1 ? 2 : 4
@@ -75,14 +70,14 @@ function readLogNumber(log: Record<string, unknown>, key: string): number | unde
   return readNumber(log[key])
 }
 
-function formatYieldAmount(value: number | undefined, asset: string): string {
+function formatYieldAmount(value: number | undefined, asset: string | undefined): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  if (value === 0) return `0 ${asset}`
+  if (value === 0) return asset ? `0 ${asset}` : '0'
   const sign = value > 0 ? '+' : '−'
   const abs = Math.abs(value)
   const maximumFractionDigits = abs >= 1000 ? 0 : abs >= 1 ? 2 : 4
   const formatted = abs.toLocaleString('en-US', { maximumFractionDigits })
-  return `${sign}${formatted} ${asset}`
+  return asset ? `${sign}${formatted} ${asset}` : `${sign}${formatted}`
 }
 
 function isLogPayload(value: unknown): value is BossGrinderLogPayload {
@@ -144,6 +139,7 @@ export function resolveGrinderNetworkLabel(rows: Array<{ terminal?: string }>): 
 export function mapBossLogToGrinderRow(
   bossId: string,
   payload: BossGrinderLogPayload | { error?: string } | undefined,
+  assetMeta?: BossGrinderAssetMeta,
 ): GrinderTableRow {
   const fallbackName = `Grinder ${bossId}`
 
@@ -170,8 +166,7 @@ export function mapBossLogToGrinderRow(
 
   const log = payload
   const logRecord = log as Record<string, unknown>
-  const baseAsset = log.base_asset?.trim() || 'BASE'
-  const quoteAsset = log.quote_asset?.trim() || 'QUOTE'
+  const { baseAsset, quoteAsset } = resolveLogAssetSymbols(log, assetMeta)
   const balanceBase = readLogNumber(logRecord, 'balance_base')
   const balanceQuote = readLogNumber(logRecord, 'balance_quote')
   const spotPrice = readLogNumber(logRecord, 'spot_price')
@@ -233,9 +228,10 @@ export function summarizeGrinderTableRows(rows: GrinderTableRow[]): GrinderTable
 
 export function buildGrinderTableFromBossLogs(
   snapshot: BossGrinderLogsSnapshot,
+  assetMeta: Record<string, BossGrinderAssetMeta> = {},
 ): { rows: GrinderTableRow[]; summary: GrinderTableSummary } {
-  const rows = sortBossGrinderIds(Object.keys(snapshot)).map((bossId) =>
-    mapBossLogToGrinderRow(bossId, snapshot[bossId]),
+  const rows = sortBossGrinderIds(Object.keys(snapshot).filter((id) => id !== BOSS_LOGS_META_KEY)).map((bossId) =>
+    mapBossLogToGrinderRow(bossId, snapshot[bossId], assetMeta[bossId]),
   )
 
   return {

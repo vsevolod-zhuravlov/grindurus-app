@@ -2,6 +2,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { useMemo, useCallback } from 'react'
 import { useWalletContext } from '../providers/AppWalletProvider'
+import { shortenAddress } from '../utils/shortenAddress'
 
 function detectClusterFromRpcEndpoint(endpoint?: string): 'mainnet-beta' | 'testnet' | 'devnet' | null {
   if (!endpoint) return null
@@ -40,7 +41,7 @@ export function useSolanaWallet() {
 
   const shortAddress = useMemo(() => {
     if (!address) return ''
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
+    return shortenAddress(address, { tail: 4 })
   }, [address])
 
   const walletDetectedCluster = useMemo(() => {

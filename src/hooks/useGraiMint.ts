@@ -1,84 +1,39 @@
-import { useCallback, useState } from 'react'
-import { PublicKey, Transaction } from '@solana/web3.js'
+import { useCallback } from 'react'
+import { PublicKey } from '@solana/web3.js'
 import { executeMint } from '../grai/buildMintTransaction'
-import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
-import { useSolanaWallet } from './useSolanaWallet'
+import { useGraiTransaction, type GraiTransactionStatus } from './useGraiTransaction'
 
-export type GraiMintStatus = 'idle' | 'building' | 'signing' | 'confirming' | 'success' | 'error'
+export type GraiMintStatus = GraiTransactionStatus
 
 export function useGraiMint() {
-  const solanaWallet = useSolanaWallet()
-  const { connection, solana, clusterMismatch } = useGraiDeployment()
-  const [status, setStatus] = useState<GraiMintStatus>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [lastSignature, setLastSignature] = useState<string | null>(null)
+  const { run, reset, status, error, lastSignature, isPending } = useGraiTransaction()
 
   const mint = useCallback(
     async (params: { assetMint: string; amountInput: string }) => {
-      setError(null)
-      setLastSignature(null)
-
-      if (!solanaWallet.publicKey) {
-        solanaWallet.connect()
-        throw new Error('Connect a Solana wallet to mint GRAI')
-      }
-
-      if (!solanaWallet.signTransaction) {
-        throw new Error('Connected wallet cannot sign transactions')
-      }
-
-      if (!connection || !solana) {
-        throw new Error('GRAI is not configured for this network')
-      }
-
-      if (clusterMismatch) {
-        throw new Error(`Switch your Solana wallet to ${solana.cluster} to mint GRAI`)
-      }
-
       const amountInput = params.amountInput.trim()
-      if (!amountInput || amountInput === '0' || amountInput === '0.') {
-        throw new Error('Enter an amount to mint')
-      }
-
-      const minter = solanaWallet.publicKey
       const assetMint = new PublicKey(params.assetMint)
 
-      try {
-        setStatus('building')
-        const signTransaction = async (transaction: Transaction) => {
-          setStatus('signing')
-          return solanaWallet.signTransaction!(transaction)
-        }
+      const { signature } = await run({
+        connectMessage: 'Connect a Solana wallet to mint GRAI',
+        clusterAction: 'mint GRAI',
+        failureMessage: 'Mint transaction failed',
+        amountInput: params.amountInput,
+        emptyAmountMessage: 'Enter an amount to mint',
+        execute: ({ connection, solana, publicKey, signTransaction }) =>
+          executeMint({
+            connection,
+            config: solana,
+            minter: publicKey,
+            assetMint,
+            amountInput,
+            signTransaction,
+          }),
+      })
 
-        setStatus('confirming')
-        const { signature } = await executeMint({
-          connection,
-          config: solana,
-          minter,
-          assetMint,
-          amountInput,
-          signTransaction,
-        })
-
-        setLastSignature(signature)
-        setStatus('success')
-        return signature
-      } catch (mintError) {
-        const message =
-          mintError instanceof Error ? mintError.message : 'Mint transaction failed'
-        setError(message)
-        setStatus('error')
-        throw mintError
-      }
+      return signature
     },
-    [clusterMismatch, connection, solana, solanaWallet],
+    [run],
   )
-
-  const reset = useCallback(() => {
-    setStatus('idle')
-    setError(null)
-    setLastSignature(null)
-  }, [])
 
   return {
     mint,
@@ -86,6 +41,6 @@ export function useGraiMint() {
     status,
     error,
     lastSignature,
-    isMinting: status === 'building' || status === 'signing' || status === 'confirming',
+    isMinting: isPending,
   }
 }

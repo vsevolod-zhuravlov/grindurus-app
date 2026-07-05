@@ -7,6 +7,7 @@ import { VersionedTransaction } from '@solana/web3.js'
 import { Buffer } from 'buffer'
 import { useAccount, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
+import { stripTrailingSlash } from '../utils/urlUtils'
 import { useWalletContext } from '../providers/AppWalletProvider'
 import { InventoryHistoryChart, type InventoryHistoryPoint } from '../components/InventoryHistoryChart'
 import { YieldChart, type YieldHistoryPoint } from '../components/YieldChart'
@@ -737,7 +738,7 @@ function BacktestPage() {
       : `Pay 1 ${quoteValue} and run backtest`
 
   const backtestApiOrigin = useMemo(
-    () => (import.meta.env.VITE_BACKTEST_API_URL ?? 'http://localhost:8001').replace(/\/$/, ''),
+    () => stripTrailingSlash(import.meta.env.VITE_BACKTEST_API_URL ?? 'http://localhost:8001'),
     []
   )
   const paidFetch = useMemo(() => {

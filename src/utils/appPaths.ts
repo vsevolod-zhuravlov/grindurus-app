@@ -1,3 +1,5 @@
+import { stripTrailingSlash } from './urlUtils'
+
 /** Logical app routes (without GitHub Pages base prefix). */
 export type AppLogicalPath = '/' | '/grai' | '/grai/manage' | '/backtest'
 
@@ -20,7 +22,7 @@ export function toAppPath(path: string): string {
 
 /** Strip Vite `base` from `location.pathname` to get a logical route. */
 export function stripBasePath(pathname: string): string {
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const base = stripTrailingSlash(import.meta.env.BASE_URL)
   if (!base) return pathname || '/'
   if (pathname === base) return '/'
   if (pathname.startsWith(`${base}/`)) {
