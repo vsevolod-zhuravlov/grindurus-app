@@ -7,7 +7,7 @@ import { useGrinderLastTx } from '../../hooks/useGrinderLastTx'
 import { useWalletContext } from '../../providers/AppWalletProvider'
 import { summarizeGrinderTableRows } from '../../boss/grinderTable'
 import { grinderRowMatchesCaip2Network } from '../../wallet/caip2Network'
-import { assetUrl, toAppPath } from '../../utils/appPaths'
+import { toAppPath } from '../../utils/appPaths'
 import { navigateToGraiSection } from '../../utils/graiNavigation'
 import {
   GraiGrinderCountValue,
@@ -35,6 +35,7 @@ export function GraiGrindersSection() {
   const [isGrindersTableHidden, setIsGrindersTableHidden] = useState(true)
   const [isGrindersFilterEnabled, setIsGrindersFilterEnabled] = useState(false)
   const [isBossEndpointsOpen, setIsBossEndpointsOpen] = useState(false)
+  const [shouldMountBossEndpoints, setShouldMountBossEndpoints] = useState(false)
   const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
   const bossEndpoints = useBossEndpointUrls()
   const {
@@ -44,7 +45,8 @@ export function GraiGrindersSection() {
     isBossUnavailable,
   } = useBossGrinderTable(bossEndpoints.activeUrls, bossEndpoints.isMetadataReady)
   const walletNetworkCaip2 = activeWallet.networkCaip2
-  const isGrindersNetworkFilterActive = isGrindersFilterEnabled && Boolean(walletNetworkCaip2)
+  const isGrindersNetworkFilterActive =
+    activeWallet.isConnected && isGrindersFilterEnabled && Boolean(walletNetworkCaip2)
   const displayGrinderRows = useMemo(() => {
     if (!isGrindersNetworkFilterActive || !walletNetworkCaip2) return grinderRows
     return grinderRows.filter((row) => grinderRowMatchesCaip2Network(row, walletNetworkCaip2))
@@ -62,10 +64,15 @@ export function GraiGrindersSection() {
   const isGrinderNetworkConnected = activeWallet.isConnected && Boolean(walletNetworkCaip2)
   const grinderUptimeLabel = isBossGrinderLive ? '99.999%' : '—'
   const toggleGrindersFilter = useCallback(() => {
+    if (!activeWallet.isConnected) return
     setIsGrindersFilterEnabled((enabled) => !enabled)
-  }, [])
+  }, [activeWallet.isConnected])
   const toggleBossEndpoints = useCallback(() => {
-    setIsBossEndpointsOpen((open) => !open)
+    setIsBossEndpointsOpen((open) => {
+      const nextOpen = !open
+      if (nextOpen) setShouldMountBossEndpoints(true)
+      return nextOpen
+    })
   }, [])
   const showGrindersTotalLabels = !isGrindersFilterEnabled
   const copyGrinderTableAddress = useCallback(async (address: string, grinderId: string) => {
@@ -89,134 +96,96 @@ export function GraiGrindersSection() {
     return () => mediaQuery.removeEventListener('change', onChange)
   }, [])
 
+  useEffect(() => {
+    if (!activeWallet.isConnected) {
+      setIsGrindersFilterEnabled(false)
+    }
+  }, [activeWallet.isConnected])
+
+  const grindersNetworkFilterToggle = (
+    <button
+      type="button"
+      role="switch"
+      className={`grai-grinders-filter-toggle${isGrindersFilterEnabled ? ' is-active' : ''}${activeWallet.isConnected ? '' : ' is-disabled'}`}
+      onClick={toggleGrindersFilter}
+      aria-checked={isGrindersFilterEnabled}
+      aria-disabled={!activeWallet.isConnected}
+      disabled={!activeWallet.isConnected}
+      aria-label={
+        isGrindersFilterEnabled ? 'Disable grinder network filter' : 'Enable grinder network filter'
+      }
+    >
+      <span className="grai-grinders-filter-toggle-stack" aria-hidden="true">
+        <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--all">
+          TOTAL
+        </span>
+        <span className="grai-grinders-filter-toggle-track">
+          <span className="grai-grinders-filter-toggle-thumb" />
+        </span>
+        <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--network">
+          BY NETWORK
+        </span>
+      </span>
+    </button>
+  )
+
   const grinderNetworkAction = isGrinderNetworkConnected ? (
     <WalletNetworkSelect variant="compact" ariaLabel="Select wallet network" />
   ) : (
     <GraiGrindersSummaryConnectButton onConnect={openChainSelector} />
   )
+  const grindersSummaryFilterRow = isCompactGrindersLayout ? (
+    <div className="grai-grinders-summary-filter-wrap grai-grinders-summary-filter-wrap--compact-row">
+      {grindersNetworkFilterToggle}
+      <span className="grai-grinders-summary-toolbar-network">
+        <span className="grai-grinders-network-action">{grinderNetworkAction}</span>
+      </span>
+    </div>
+  ) : (
+    <div className="grai-grinders-summary-filter-wrap">{grindersNetworkFilterToggle}</div>
+  )
+
+  const bossEndpointsToggle = (
+    <div className="grai-grinders-summary-toggle grai-grinders-endpoints-toggle-wrap">
+      <button
+        type="button"
+        className={`grai-donut-legend-toggle grai-grinders-endpoints-toggle ${isBossEndpointsOpen ? '' : 'is-collapsed'}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          toggleBossEndpoints()
+        }}
+        aria-expanded={isBossEndpointsOpen}
+        aria-controls="grai-boss-endpoints-panel"
+        aria-label={isBossEndpointsOpen ? 'Hide Boss API endpoints' : 'Show Boss API endpoints'}
+      >
+        <svg
+          className="grai-donut-legend-toggle-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+    </div>
+  )
 
   return (
     <div className="grai-bottom-row">
       <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
-        <div className="grai-grinders-summary-toolbar">
-          {isCompactGrindersLayout ? (
-            <>
-              <div className="grai-grinders-summary-toolbar-top">
-                <button
-                  type="button"
-                  className={`grai-page-endpoints-btn grai-grinders-summary-endpoints-btn${isBossEndpointsOpen ? ' is-active' : ' is-collapsed'}`}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleBossEndpoints()
-                  }}
-                  aria-expanded={isBossEndpointsOpen}
-                  aria-controls="grai-boss-endpoints-panel"
-                  aria-label="Boss API endpoints"
-                >
-                  <svg
-                    className="grai-page-endpoints-btn-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                  endpoints
-                </button>
-              </div>
-              <div className="grai-grinders-summary-toolbar-bottom">
-                <button
-                  type="button"
-                  role="switch"
-                  className={`grai-grinders-filter-toggle${isGrindersFilterEnabled ? ' is-active' : ''}`}
-                  onClick={toggleGrindersFilter}
-                  aria-checked={isGrindersFilterEnabled}
-                  aria-label={
-                    isGrindersFilterEnabled ? 'Disable grinder network filter' : 'Enable grinder network filter'
-                  }
-                >
-                  <span className="grai-grinders-filter-toggle-stack" aria-hidden="true">
-                    <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--all">
-                      TOTAL
-                    </span>
-                    <span className="grai-grinders-filter-toggle-track">
-                      <span className="grai-grinders-filter-toggle-thumb" />
-                    </span>
-                    <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--network">
-                      BY NETWORK
-                    </span>
-                  </span>
-                </button>
-                <span className="grai-grinders-summary-toolbar-network">
-                  <span className="grai-grinders-network-action">{grinderNetworkAction}</span>
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                role="switch"
-                className={`grai-grinders-filter-toggle${isGrindersFilterEnabled ? ' is-active' : ''}`}
-                onClick={toggleGrindersFilter}
-                aria-checked={isGrindersFilterEnabled}
-                aria-label={
-                  isGrindersFilterEnabled ? 'Disable grinder network filter' : 'Enable grinder network filter'
-                }
-              >
-                <span className="grai-grinders-filter-toggle-stack" aria-hidden="true">
-                  <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--all">
-                    TOTAL
-                  </span>
-                  <span className="grai-grinders-filter-toggle-track">
-                    <span className="grai-grinders-filter-toggle-thumb" />
-                  </span>
-                  <span className="grai-grinders-filter-toggle-caption grai-grinders-filter-toggle-caption--network">
-                    BY NETWORK
-                  </span>
-                </span>
-              </button>
-              <div className="grai-grinders-summary-toolbar-actions">
-                <button
-                  type="button"
-                  className={`grai-page-endpoints-btn grai-grinders-summary-endpoints-btn${isBossEndpointsOpen ? ' is-active' : ' is-collapsed'}`}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleBossEndpoints()
-                  }}
-                  aria-expanded={isBossEndpointsOpen}
-                  aria-controls="grai-boss-endpoints-panel"
-                  aria-label="Boss API endpoints"
-                >
-                  <svg
-                    className="grai-page-endpoints-btn-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                  endpoints
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        {grindersSummaryFilterRow}
+        {bossEndpointsToggle}
         <div
           id="grai-boss-endpoints-panel"
           className={`grai-boss-endpoints-panel${isBossEndpointsOpen ? ' is-open' : ''}`}
           aria-hidden={!isBossEndpointsOpen}
         >
           <div className="grai-boss-endpoints-panel-inner">
-            {isBossEndpointsOpen ? (
+            {shouldMountBossEndpoints ? (
               <Suspense fallback={<span className="grai-boss-endpoints-status">Loading endpoints…</span>}>
                 <BossEndpointsTable endpoints={bossEndpoints} />
               </Suspense>
@@ -344,7 +313,7 @@ export function GraiGrindersSection() {
                       <span className="grai-grinders-col-head-label">Last tx</span>
                     </span>
                   </span>
-                  <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinder">
+                  <span role="columnheader" className="grai-grinders-col-grinder" aria-label="Grinders">
                     <a
                       href={`${toAppPath('/grai')}#allocate`}
                       className="grai-grinders-col-grinder-link"
@@ -354,16 +323,7 @@ export function GraiGrindersSection() {
                         navigateToGraiSection('allocate')
                       }}
                     >
-                      <span className="grai-grinders-col-logos" aria-hidden="true">
-                        {displayGrinderRows.map((row) => (
-                          <img
-                            key={row.id}
-                            src={assetUrl('logo.png')}
-                            alt=""
-                            className="grai-grinders-col-logo"
-                          />
-                        ))}
-                      </span>
+                      <span className="grai-grinders-col-head-label">GRINDERS</span>
                     </a>
                   </span>
                   <span role="columnheader" className="grai-grinders-col-head is-last-action">

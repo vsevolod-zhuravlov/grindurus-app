@@ -9,12 +9,14 @@ export function GraiGrindersTotalLabel({
   rest: string
 }) {
   return (
-    <span className="grai-grinders-filter-total-label">
+    <span
+      className={`grai-grinders-filter-total-label${showTotal ? ' has-total-prefix' : ''}`}
+    >
       <span
         className={`grai-grinders-filter-total-prefix${showTotal ? ' is-visible' : ''}`}
         aria-hidden={showTotal ? undefined : true}
       >
-        <span className="grai-grinders-filter-total-prefix-inner">TOTAL </span>
+        <span className="grai-grinders-filter-total-prefix-inner">TOTAL</span>
       </span>
       {rest}
     </span>

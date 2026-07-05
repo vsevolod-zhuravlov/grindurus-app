@@ -4,6 +4,7 @@ import '@rainbow-me/rainbowkit/styles.css'
 import '../rainbowkit-fix.css'
 import { startScrollLockGapPatch } from '../utils/patchScrollLockGap'
 import { RainbowKitConnectBridge } from './RainbowKitConnectBridge'
+import { RainbowKitLoadingOverlay } from './RainbowKitLoadingOverlay'
 
 function useDataThemeIsDark() {
   const [isDark, setIsDark] = useState(
@@ -39,6 +40,7 @@ export function RainbowKitShell({ children }: { children: ReactNode }) {
   return (
     <RainbowKitProvider theme={rkTheme} modalSize="compact" locale="en-US">
       <RainbowKitConnectBridge />
+      <RainbowKitLoadingOverlay />
       {children}
     </RainbowKitProvider>
   )

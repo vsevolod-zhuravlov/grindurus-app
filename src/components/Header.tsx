@@ -77,7 +77,7 @@ const BACKTEST_MENU_ICON = (
 )
 
 const GRAI_SECTIONS: { section: GraiSection; label: string; icon: JSX.Element }[] = [
-  { section: 'grinders', label: 'Grinders', icon: GRAI_GRINDERS_MENU_ICON },
+  { section: 'grinders', label: 'GRINDERS', icon: GRAI_GRINDERS_MENU_ICON },
   { section: 'mint', label: 'MINT', icon: GRAI_MINT_MENU_ICON },
   { section: 'burn', label: 'BURN', icon: GRAI_BURN_MENU_ICON },
   { section: 'assets', label: 'ASSETS', icon: GRAI_ASSET_MENU_ICON },
@@ -210,7 +210,7 @@ function Header({ activeView, onViewChange }: HeaderProps) {
                   onViewChange('grai')
                 }}
               >
-                GRAI Home
+                GRAI
               </button>
               <GraiMenuItems
                 isGraiPage={isGraiPage}

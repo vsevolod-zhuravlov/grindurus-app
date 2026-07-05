@@ -4,6 +4,7 @@ import { clearBossEndpointProbeCache, useBossEndpointProbes } from '../hooks/use
 import type { BossEndpointUrlsState } from '../hooks/useBossEndpointUrls'
 import { requestGraiBossMetadataReload } from '../hooks/useGraiTokenMetadata'
 import { ENDPOINTS_ICON, ENDPOINTS_RESET_ICON, ENDPOINTS_TABLE_COLUMN_ICONS } from './grai/graiPageIcons'
+import { GraiFieldInfoButton } from './grai/GraiFieldInfo'
 
 type BossEndpointsTableProps = {
   endpoints: BossEndpointUrlsState
@@ -11,6 +12,9 @@ type BossEndpointsTableProps = {
 
 const RESET_ENDPOINTS_HINT =
   'Clear local endpoint changes and re-fetch boss URLs from GRAI metadata (metadata.json).'
+
+const ENDPOINTS_LEAD_HINT =
+  'Boss API URIs for grinder data. Defaults load from GRAI metadata; reorder, probe, edit, or add URIs locally.'
 
 function BossEndpointsColumnHead({ icon, label }: { icon: ReactNode; label: string }) {
   return (
@@ -203,12 +207,19 @@ export function BossEndpointsTable({ endpoints }: BossEndpointsTableProps) {
   return (
     <div className="grai-boss-endpoints">
       <div className="grai-boss-endpoints-header">
-        <p className="grai-boss-endpoints-lead">
-          <span className="grai-boss-endpoints-lead-icon" aria-hidden="true">
-            {ENDPOINTS_ICON}
+        <GraiFieldInfoButton
+          hint={ENDPOINTS_LEAD_HINT}
+          ariaLabel={ENDPOINTS_LEAD_HINT}
+          className="grai-boss-endpoints-lead-wrap"
+          tooltipClassName="grai-boss-endpoints-lead-tooltip"
+        >
+          <span className="grai-boss-endpoints-lead">
+            <span className="grai-boss-endpoints-lead-icon" aria-hidden="true">
+              {ENDPOINTS_ICON}
+            </span>
+            Endpoints
           </span>
-          Endpoints
-        </p>
+        </GraiFieldInfoButton>
         <span className="grai-field-info-wrap grai-boss-endpoints-reset-wrap">
           <button
             type="button"
