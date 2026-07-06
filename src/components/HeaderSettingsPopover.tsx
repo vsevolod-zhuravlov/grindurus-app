@@ -182,93 +182,94 @@ export function HeaderSettingsPopover() {
         {isOpen ? <X size={18} strokeWidth={2.2} aria-hidden="true" /> : <Settings size={18} strokeWidth={2} aria-hidden="true" />}
       </button>
 
-      {isOpen && (
-        <div
-          className="header-settings-popover"
-          role="dialog"
-          aria-label="Settings"
-        >
-          <div className="header-settings-row">
-            <SegmentedToggle
-              value={soundEnabled ? 'on' : 'off'}
-              options={[
-                { value: 'on', icon: <Volume2 size={16} strokeWidth={2} aria-hidden="true" />, label: 'Sound on' },
-                { value: 'off', icon: <VolumeX size={16} strokeWidth={2} aria-hidden="true" />, label: 'Sound off' },
-              ]}
-              onChange={(value) => setSoundEnabled(value === 'on')}
-              ariaLabel="Sound"
-            />
-            <SegmentedToggle
-              value={theme}
-              options={[
-                { value: 'light', icon: <Sun size={16} strokeWidth={2} aria-hidden="true" />, label: 'Light mode' },
-                { value: 'dark', icon: <Moon size={16} strokeWidth={2} aria-hidden="true" />, label: 'Dark mode' },
-              ]}
-              onChange={setTheme}
-              ariaLabel="Theme"
-            />
-          </div>
+      <span className={`header-settings-trigger-tail${isOpen ? ' is-open' : ''}`} aria-hidden="true" />
 
-          {activeWallet.isConnected && (
-            <>
-              <button
-                type="button"
-                className="header-settings-action"
-                onClick={() => setIsNetworkOpen((open) => !open)}
-                aria-expanded={isNetworkOpen}
-              >
-                {currentNetworkIcon}
-                <span className="header-settings-action-label">{activeWallet.networkName}</span>
-                <ChevronRight className="header-settings-action-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
-              </button>
-
-              {isNetworkOpen && (
-                <div className="header-settings-network-list" role="menu" aria-label="Select network">
-                  {activeWallet.chainType === 'evm' &&
-                    evmWallet.supportedChains.map((chain) => (
-                      <button
-                        key={chain.id}
-                        type="button"
-                        role="menuitem"
-                        className={`header-settings-network-item${evmWallet.chainId === chain.id ? ' is-active' : ''}`}
-                        onClick={() => handleNetworkSelect(chain.id)}
-                        title={evmChainIdToCaip2(chain.id)}
-                      >
-                        <span className="header-settings-network-icon">
-                          <EvmChainIcon name={chain.name} />
-                        </span>
-                        <span>{chain.name}</span>
-                      </button>
-                    ))}
-                  {activeWallet.chainType === 'solana' &&
-                    solanaWallet.supportedClusters.map((cluster) => (
-                      <button
-                        key={cluster.id}
-                        type="button"
-                        role="menuitem"
-                        className={`header-settings-network-item${solanaWallet.cluster === cluster.id ? ' is-active' : ''}`}
-                        onClick={() => handleClusterSelect(cluster.id)}
-                        title={solanaClusterToCaip2(cluster.id)}
-                      >
-                        <SolanaClusterIcon clusterId={cluster.id} />
-                        <span>{cluster.name}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-
-              <button
-                type="button"
-                className="header-settings-action header-settings-action--disconnect"
-                onClick={() => void handleDisconnect()}
-              >
-                <LogOut size={16} strokeWidth={2} aria-hidden="true" />
-                <span className="header-settings-action-label">Disconnect</span>
-              </button>
-            </>
-          )}
+      <div
+        className={`header-settings-popover${isOpen ? ' is-open' : ''}`}
+        role="dialog"
+        aria-label="Settings"
+        aria-hidden={!isOpen}
+      >
+        <div className="header-settings-row">
+          <SegmentedToggle
+            value={soundEnabled ? 'on' : 'off'}
+            options={[
+              { value: 'on', icon: <Volume2 size={16} strokeWidth={2} aria-hidden="true" />, label: 'Sound on' },
+              { value: 'off', icon: <VolumeX size={16} strokeWidth={2} aria-hidden="true" />, label: 'Sound off' },
+            ]}
+            onChange={(value) => setSoundEnabled(value === 'on')}
+            ariaLabel="Sound"
+          />
+          <SegmentedToggle
+            value={theme}
+            options={[
+              { value: 'light', icon: <Sun size={16} strokeWidth={2} aria-hidden="true" />, label: 'Light mode' },
+              { value: 'dark', icon: <Moon size={16} strokeWidth={2} aria-hidden="true" />, label: 'Dark mode' },
+            ]}
+            onChange={setTheme}
+            ariaLabel="Theme"
+          />
         </div>
-      )}
+
+        {activeWallet.isConnected && (
+          <>
+            <button
+              type="button"
+              className="header-settings-action"
+              onClick={() => setIsNetworkOpen((open) => !open)}
+              aria-expanded={isNetworkOpen}
+            >
+              {currentNetworkIcon}
+              <span className="header-settings-action-label">{activeWallet.networkName}</span>
+              <ChevronRight className="header-settings-action-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+
+            {isNetworkOpen && (
+              <div className="header-settings-network-list" role="menu" aria-label="Select network">
+                {activeWallet.chainType === 'evm' &&
+                  evmWallet.supportedChains.map((chain) => (
+                    <button
+                      key={chain.id}
+                      type="button"
+                      role="menuitem"
+                      className={`header-settings-network-item${evmWallet.chainId === chain.id ? ' is-active' : ''}`}
+                      onClick={() => handleNetworkSelect(chain.id)}
+                      title={evmChainIdToCaip2(chain.id)}
+                    >
+                      <span className="header-settings-network-icon">
+                        <EvmChainIcon name={chain.name} />
+                      </span>
+                      <span>{chain.name}</span>
+                    </button>
+                  ))}
+                {activeWallet.chainType === 'solana' &&
+                  solanaWallet.supportedClusters.map((cluster) => (
+                    <button
+                      key={cluster.id}
+                      type="button"
+                      role="menuitem"
+                      className={`header-settings-network-item${solanaWallet.cluster === cluster.id ? ' is-active' : ''}`}
+                      onClick={() => handleClusterSelect(cluster.id)}
+                      title={solanaClusterToCaip2(cluster.id)}
+                    >
+                      <SolanaClusterIcon clusterId={cluster.id} />
+                      <span>{cluster.name}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="header-settings-action header-settings-action--disconnect"
+              onClick={() => void handleDisconnect()}
+            >
+              <LogOut size={16} strokeWidth={2} aria-hidden="true" />
+              <span className="header-settings-action-label">Disconnect</span>
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

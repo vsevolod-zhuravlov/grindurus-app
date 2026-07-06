@@ -18,16 +18,58 @@
   transition: all 0.2s ease;
 }
 
-.header-settings-trigger:hover,
+.header-settings-trigger:hover:not(.is-open) {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 .header-settings-trigger.is-open {
-  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-  border-color: #ff69b4;
-  color: #fff;
+  position: relative;
+  z-index: 121;
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.header-settings-trigger.is-open:hover {
+  background: var(--bg-tertiary);
 }
 
 .header-settings-trigger:focus-visible {
   outline: 2px solid var(--header-wallet-accent-border, #c06090);
   outline-offset: 2px;
+}
+
+.header-settings-trigger-tail {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 39px;
+  height: calc(var(--header-wallet-cluster-gap, 1rem) + 1px);
+  box-sizing: border-box;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 121;
+}
+
+.header-settings-trigger-tail.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (max-width: 768px) {
+  .header-settings-trigger-tail {
+    width: var(--header-control-size, 40px);
+  }
 }
 
 .header-settings-popover {
@@ -41,6 +83,7 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 14px;
+  border-top-right-radius: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -48,12 +91,31 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(12px);
   z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform-origin: top right;
+  transform: scale(0.94) translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.2s ease;
+}
+
+.header-settings-popover.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1) translateY(0);
 }
 
 [data-theme="light"] .header-settings-popover {
   --header-settings-control-border: rgba(0, 0, 0, 0.16);
   --header-settings-disconnect-border: rgba(220, 38, 38, 0.44);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-settings-popover {
+    transition: none;
+  }
 }
 
 .header-settings-row {
