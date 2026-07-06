@@ -29,6 +29,8 @@ const BossEndpointsTable = lazy(() =>
   import('../BossEndpointsTable').then((m) => ({ default: m.BossEndpointsTable })),
 )
 
+const GRINDERS_TABLE_PAGE_SIZE = 10
+
 export function GraiGrindersSection() {
   const { openChainSelector } = useWalletContext()
   const activeWallet = useActiveWallet()
@@ -37,6 +39,7 @@ export function GraiGrindersSection() {
   const [isBossEndpointsOpen, setIsBossEndpointsOpen] = useState(false)
   const [shouldMountBossEndpoints, setShouldMountBossEndpoints] = useState(false)
   const [copiedGrinderId, setCopiedGrinderId] = useState<string | null>(null)
+  const [grindersTablePage, setGrindersTablePage] = useState(0)
   const bossEndpoints = useBossEndpointUrls()
   const {
     rows: grinderRows,
@@ -51,6 +54,18 @@ export function GraiGrindersSection() {
     if (!isGrindersNetworkFilterActive || !walletNetworkCaip2) return grinderRows
     return grinderRows.filter((row) => grinderRowMatchesCaip2Network(row, walletNetworkCaip2))
   }, [grinderRows, isGrindersNetworkFilterActive, walletNetworkCaip2])
+  const grindersTablePageCount = Math.max(1, Math.ceil(displayGrinderRows.length / GRINDERS_TABLE_PAGE_SIZE))
+  const paginatedGrinderRows = useMemo(() => {
+    const start = grindersTablePage * GRINDERS_TABLE_PAGE_SIZE
+    return displayGrinderRows.slice(start, start + GRINDERS_TABLE_PAGE_SIZE)
+  }, [displayGrinderRows, grindersTablePage])
+  const grindersTableRangeStart =
+    displayGrinderRows.length === 0 ? 0 : grindersTablePage * GRINDERS_TABLE_PAGE_SIZE + 1
+  const grindersTableRangeEnd = Math.min(
+    (grindersTablePage + 1) * GRINDERS_TABLE_PAGE_SIZE,
+    displayGrinderRows.length,
+  )
+  const showGrindersTablePagination = displayGrinderRows.length > GRINDERS_TABLE_PAGE_SIZE
   const displayGrinderSummary = useMemo(
     () => summarizeGrinderTableRows(displayGrinderRows),
     [displayGrinderRows],
@@ -101,6 +116,14 @@ export function GraiGrindersSection() {
       setIsGrindersFilterEnabled(false)
     }
   }, [activeWallet.isConnected])
+
+  useEffect(() => {
+    setGrindersTablePage(0)
+  }, [isGrindersNetworkFilterActive, walletNetworkCaip2])
+
+  useEffect(() => {
+    setGrindersTablePage((page) => Math.min(page, grindersTablePageCount - 1))
+  }, [displayGrinderRows.length, grindersTablePageCount])
 
   const grindersNetworkFilterToggle = (
     <button
@@ -158,18 +181,23 @@ export function GraiGrindersSection() {
         aria-controls="grai-boss-endpoints-panel"
         aria-label={isBossEndpointsOpen ? 'Hide Boss API endpoints' : 'Show Boss API endpoints'}
       >
-        <svg
-          className="grai-donut-legend-toggle-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        <span className="grai-grinders-section-toggle-inner">
+          <svg
+            className="grai-donut-legend-toggle-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+          <span className="grai-grinders-section-toggle-label" aria-hidden="true">
+            ENDPOINTS
+          </span>
+        </span>
       </button>
     </div>
   )
@@ -364,7 +392,7 @@ export function GraiGrindersSection() {
                       : 'No grinders in the Boss fleet.'}
                   </p>
                 ) : (
-                  displayGrinderRows.map((row) => (
+                  paginatedGrinderRows.map((row) => (
                     <div className="grai-grinders-row" role="row" key={row.id}>
                       <GraiGrinderLastTxCell
                         lastActionLabel={row.lastActionLabel}
@@ -393,6 +421,37 @@ export function GraiGrindersSection() {
                     </div>
                   ))
                 )}
+                {showGrindersTablePagination ? (
+                  <div
+                    className="grai-grinders-table-pagination"
+                    role="navigation"
+                    aria-label="Grinders table pagination"
+                  >
+                    <button
+                      type="button"
+                      className="grai-grinders-table-pagination-btn"
+                      onClick={() => setGrindersTablePage((page) => Math.max(0, page - 1))}
+                      disabled={grindersTablePage === 0}
+                      aria-label="Previous grinders page"
+                    >
+                      Prev
+                    </button>
+                    <span className="grai-grinders-table-pagination-status" aria-live="polite">
+                      {grindersTableRangeStart}–{grindersTableRangeEnd} of {displayGrinderRows.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="grai-grinders-table-pagination-btn"
+                      onClick={() =>
+                        setGrindersTablePage((page) => Math.min(grindersTablePageCount - 1, page + 1))
+                      }
+                      disabled={grindersTablePage >= grindersTablePageCount - 1}
+                      aria-label="Next grinders page"
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -406,18 +465,23 @@ export function GraiGrindersSection() {
             aria-controls="grai-grinders-table"
             aria-label={isGrindersTableHidden ? 'Show all grinders' : 'Hide grinders table'}
           >
-            <svg
-              className="grai-donut-legend-toggle-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M6 9l6 6 6-6" />
-            </svg>
+            <span className="grai-grinders-section-toggle-inner">
+              <svg
+                className="grai-donut-legend-toggle-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              <span className="grai-grinders-section-toggle-label" aria-hidden="true">
+                ALL GRINDERS
+              </span>
+            </span>
           </button>
         </div>
       </div>

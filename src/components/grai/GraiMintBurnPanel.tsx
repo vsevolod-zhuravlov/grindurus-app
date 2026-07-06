@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeDecimalInput } from '../../grai/onchain'
 import { formatVaultBalanceDisplay } from '../../grai/formatVaultBalance'
 import { useGraiDeployment } from '../../grai/GraiDeploymentProvider'
-import { USD_SCALE } from '../../grai/tokenomics'
 import { ACTION_TX_ICON } from '../../grai/graiActionIcons'
+import { GRAI_DECIMALS_EVM } from '../../grai/evm/constants'
+import { USD_SCALE, GRAI_DECIMALS } from '../../grai/tokenomics'
 import { useGraiAssets } from '../../hooks/useGraiAssets'
 import { useGraiBurn } from '../../hooks/useGraiBurn'
 import { useGraiBurnEstimate } from '../../hooks/useGraiBurnEstimate'
@@ -12,7 +13,7 @@ import { useGraiMint } from '../../hooks/useGraiMint'
 import { useGraiTotalSupply } from '../../hooks/useGraiTotalSupply'
 import { useGraiVaultBalances } from '../../hooks/useGraiVaultBalances'
 import { useWalletAssetBalance } from '../../hooks/useWalletAssetBalance'
-import { useSolanaWallet } from '../../hooks/useSolanaWallet'
+import { useActiveWallet } from '../../hooks/useActiveWallet'
 import { useWalletContext } from '../../providers/AppWalletProvider'
 import { VaultBalanceTableValue } from '../VaultBalanceTableValue'
 import { WalletIcon } from '../WalletIcon'
@@ -42,7 +43,19 @@ type Props = {
 
 export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   const { openChainSelector } = useWalletContext()
-  const { solana, staticSolana, solscanTokenUrl, solscanTxUrl, solscanAccountUrl } = useGraiDeployment()
+  const {
+    chainKind,
+    solana,
+    staticSolana,
+    evm,
+    explorerTokenUrl,
+    explorerTxUrl,
+    explorerAccountUrl,
+  } = useGraiDeployment()
+  const activeWallet = useActiveWallet()
+  const isWalletConnected = activeWallet.isConnected
+  const connectedWalletAddress = activeWallet.address || null
+  const shortAddress = activeWallet.shortAddress || null
   const {
     assets: mintAssets,
     isLoading: mintAssetsLoading,
@@ -55,7 +68,6 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     useGraiMint()
   const { burn: burnGrai, status: burnStatus, error: burnError, lastSignature: burnSignature, lastAmountLabel: burnAmountLabel, isBurning, reset: resetBurn } =
     useGraiBurn()
-  const { isConnected: isSolanaConnected, shortAddress, address: connectedWalletAddress } = useSolanaWallet()
 
   const [mintAmount, setMintAmount] = useState('')
   const [selectedMint, setSelectedMint] = useState('')
@@ -87,21 +99,35 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     () => new Map(burnOutputs.map((output) => [output.asset.mint, output])),
     [burnOutputs],
   )
+  const usdScale = chainKind === 'evm' ? GRAI_DECIMALS_EVM : USD_SCALE
   const burnTotalUsdLabel = useMemo(() => {
     if (!burnAmount.trim()) return '—'
     if (isBurnEstimateLoading) return '…'
     const totalUsd = burnOutputs.reduce((sum, output) => sum + output.usdRaw, 0n)
     if (totalUsd <= 0n) return '$0'
-    return `$${formatVaultBalanceDisplay(totalUsd, USD_SCALE)}`
-  }, [burnAmount, burnOutputs, isBurnEstimateLoading])
-  const graiMintAddress = solana?.graiMint.toBase58() ?? staticSolana?.graiMint.toBase58() ?? '—'
-  const graiSolscanHref = graiMintAddress !== '—' ? solscanTokenUrl(graiMintAddress) : null
+    return `$${formatVaultBalanceDisplay(totalUsd, usdScale)}`
+  }, [burnAmount, burnOutputs, isBurnEstimateLoading, usdScale])
+  const isBurnConfirmed = burnStatus === 'success' && Boolean(burnSignature)
+  const confirmedBurnGraiLabel = useMemo(() => {
+    if (burnAmountLabel?.trim()) return burnAmountLabel
+    const trimmed = burnAmount.trim()
+    if (trimmed) return trimmed
+    return '0'
+  }, [burnAmount, burnAmountLabel])
+  const graiMintAddress =
+    chainKind === 'evm' && evm
+      ? (evm.graiToken ?? evm.protocolAddress ?? '—')
+      : solana?.graiMint.toBase58() ?? staticSolana?.graiMint.toBase58() ?? '—'
+  const graiExplorerHref = graiMintAddress !== '—' ? explorerTokenUrl(graiMintAddress) : null
+  const defaultGraiDecimals = chainKind === 'evm' ? GRAI_DECIMALS_EVM : GRAI_DECIMALS
   const {
     balanceLabel: graiBalanceLabel,
     maxAmount: maxBurnAmount,
-    decimals: graiDecimals,
+    decimals: graiBalanceDecimals,
     refresh: refreshGraiBalance,
   } = useWalletAssetBalance(actionView === 'burn' ? graiMintAddress : undefined, actionView === 'burn' ? 'GRAI' : undefined)
+
+  const graiDecimals = graiBalanceDecimals ?? defaultGraiDecimals
 
   const copyMinterWalletAddress = useCallback(() => {
     if (!connectedWalletAddress) return
@@ -130,7 +156,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   useEffect(() => {
     resetMint()
     resetBurn()
-  }, [selectedMint, actionView, resetMint, resetBurn])
+  }, [selectedMint, actionView])
 
   useEffect(() => {
     setMintAmount('')
@@ -165,11 +191,12 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
       await mintGrai({
         assetMint: selectedAsset.mint,
         amountInput: mintAmount,
+        assetDecimals: assetDecimals ?? undefined,
       })
     } catch {
       // Error state is handled in useGraiMint.
     }
-  }, [mintAmount, mintGrai, selectedAsset?.mint])
+  }, [assetDecimals, mintAmount, mintGrai, selectedAsset?.mint])
 
   const handleBurn = useCallback(async () => {
     primeBullSound()
@@ -194,7 +221,11 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   return (
     <div className="grai-actions-row grai-actions-row-mint">
       <div className="grai-action-card grai-mint">
-          <div className="grai-action-switch" role="tablist" aria-label="Mint or burn GRAI">
+          <div
+            className={`grai-action-switch is-${actionView}-active`}
+            role="tablist"
+            aria-label="Mint or burn GRAI"
+          >
             <button
               type="button"
               role="tab"
@@ -224,13 +255,13 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                 <GraiWalletActorRow
                   label="Minter"
                   hint="Minter wallet for signing mint transactions"
-                  isConnected={isSolanaConnected}
+                  isConnected={isWalletConnected}
                   shortAddress={shortAddress}
                   connectedWalletAddress={connectedWalletAddress}
                   walletCopied={minterWalletCopied}
                   onCopyWallet={copyMinterWalletAddress}
                   onConnect={openChainSelector}
-                  solscanAccountUrl={solscanAccountUrl}
+                  explorerAccountUrl={explorerAccountUrl}
                 />
                 <div className="grai-mint-amount-block">
                 <div className="grai-mint-amount-header">
@@ -238,16 +269,13 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                   <GraiWalletBalanceSlot
                     label={balanceLabel}
                     symbol={selectedAsset?.symbol}
-                    isConnected={isSolanaConnected}
+                    isConnected={isWalletConnected}
                   />
                 </div>
                 <div className="grai-mint-amount-field">
                   <div className="grai-mint-amount-row grai-mint-amount-row--with-asset-label">
                     <div className="grai-mint-amount-input-col">
-                      <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
-                        <span className="grai-field-label-icon" aria-hidden="true">
-                          {ACTION_SWITCH_ICONS.mint}
-                        </span>
+                      <span className="grai-field-label grai-mint-amount-input-label">
                         Deposit Amount
                       </span>
                       <div className="grai-input-with-suffix has-max">
@@ -350,12 +378,12 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                               </span>
                               <span className="grai-mint-asset-item-symbol">{asset.symbol}</span>
                               <a
-                                href={solscanTokenUrl(asset.mint)}
+                                href={explorerTokenUrl(asset.mint) ?? '#'}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="grai-mint-asset-item-solscan"
-                                aria-label={`View ${asset.symbol} on Solscan`}
-                                title={`View ${asset.symbol} on Solscan`}
+                                aria-label={`View ${asset.symbol} on block explorer`}
+                                title={`View ${asset.symbol} on block explorer`}
                                 onClick={(event) => event.stopPropagation()}
                                 onMouseDown={(event) => event.stopPropagation()}
                               >
@@ -368,21 +396,20 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                       </div>
                     </div>
                   </div>
+                  <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
                   {!isMinting && !mintError && !(mintSignature && mintStatus === 'success') ? (
-                    <>
-                      <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M6 9l6 6 6-6" />
-                        </svg>
-                      </div>
-                      <div className="grai-mint-split-shares-hint is-open" aria-label="Mint deposit split estimate">
+                    <div className="grai-mint-split-shares-hint is-open" aria-label="Mint deposit split estimate">
                         <div id="grai-mint-split-shares" className="grai-burn-assets-rows">
                           <div className="grai-burn-assets-row grai-mint-estimate-row">
                             <span className="grai-burn-assets-amount">
@@ -409,7 +436,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                             </span>
                             <span className="grai-burn-assets-token grai-mint-estimate-token">
                               {!(mintAmount.trim() && isEstimateLoading) && (
-                                <GraiEstimateSuffix solscanHref={graiSolscanHref} />
+                                <GraiEstimateSuffix explorerHref={graiExplorerHref} />
                               )}
                             </span>
                           </div>
@@ -462,12 +489,12 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                           {selectedAsset?.symbol ?? '—'}
                           {selectedAsset?.mint && (
                             <a
-                              href={solscanTokenUrl(selectedAsset.mint)}
+                              href={explorerTokenUrl(selectedAsset.mint) ?? '#'}
                               target="_blank"
                               rel="noreferrer"
                               className="grai-burn-assets-solscan"
-                              aria-label={`View ${selectedAsset.symbol} on Solscan`}
-                              title={`View ${selectedAsset.symbol} on Solscan`}
+                              aria-label={`View ${selectedAsset.symbol} on block explorer`}
+                              title={`View ${selectedAsset.symbol} on block explorer`}
                             >
                               {MINT_ASSET_SOLSCAN_ICON}
                             </a>
@@ -477,7 +504,6 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     ))}
                         </div>
                       </div>
-                    </>
                   ) : null}
                 </div>
                 {mintAssetsError && !isRegistryLoaded && (
@@ -494,7 +520,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     <p className="grai-mint-feedback is-success grai-mint-feedback-confirmed">
                       Mint confirmed:{' '}
                       <a
-                        href={solscanTxUrl(mintSignature!)}
+                        href={explorerTxUrl(mintSignature!) ?? '#'}
                         target="_blank"
                         rel="noreferrer"
                         title={mintSignature!}
@@ -524,13 +550,13 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                 <GraiWalletActorRow
                   label="Burner"
                   hint="Burner wallet for signing burn transactions"
-                  isConnected={isSolanaConnected}
+                  isConnected={isWalletConnected}
                   shortAddress={shortAddress}
                   connectedWalletAddress={connectedWalletAddress}
                   walletCopied={minterWalletCopied}
                   onCopyWallet={copyMinterWalletAddress}
                   onConnect={openChainSelector}
-                  solscanAccountUrl={solscanAccountUrl}
+                  explorerAccountUrl={explorerAccountUrl}
                 />
                 <div className="grai-mint-amount-block">
                 <div className="grai-mint-amount-header">
@@ -538,7 +564,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     <GraiWalletBalanceSlot
                       label={graiBalanceLabel}
                       symbol="GRAI"
-                      isConnected={isSolanaConnected}
+                      isConnected={isWalletConnected}
                     />
                   </div>
                 <div className="grai-mint-amount-field">
@@ -583,41 +609,39 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                         />
                       </span>
                       <span className="grai-mint-asset-symbol">GRAI</span>
-                      {solana?.graiMint && (
+                      {graiMintAddress !== '—' && (
                         <a
-                          href={solscanTokenUrl(graiMintAddress)}
+                          href={explorerTokenUrl(graiMintAddress) ?? '#'}
                           target="_blank"
                           rel="noreferrer"
                           className="grai-mint-asset-value-solscan"
-                          aria-label="View GRAI contract on Solscan"
-                          title="View GRAI contract on Solscan"
+                          aria-label="View GRAI contract on block explorer"
+                          title="View GRAI contract on block explorer"
                         >
                           {MINT_ASSET_SOLSCAN_ICON}
                         </a>
                       )}
                     </span>
                   </div>
-                  {!isBurning && !burnError && !(burnSignature && burnStatus === 'success') ? (
-                    <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </div>
-                  ) : null}
+                  <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
                 </div>
                 <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
                   <div className="grai-burn-assets-section-title">
-                    {burnSignature && burnStatus === 'success' && burnAmountLabel ? (
+                    {isBurnConfirmed ? (
                       <span className="grai-burn-confirmed-title">
                         BURNT{' '}
-                        <span className="grai-burn-confirmed-amount">{burnAmountLabel}</span>{' '}
+                        <span className="grai-burn-confirmed-amount">{confirmedBurnGraiLabel}</span>{' '}
                         GRAI
                       </span>
                     ) : (
@@ -713,12 +737,12 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                             </span>
                             {asset.symbol}
                             <a
-                              href={solscanTokenUrl(asset.mint)}
+                              href={explorerTokenUrl(asset.mint) ?? '#'}
                               target="_blank"
                               rel="noreferrer"
                               className="grai-burn-assets-solscan"
-                              aria-label={`View ${asset.symbol} on Solscan`}
-                              title={`View ${asset.symbol} on Solscan`}
+                              aria-label={`View ${asset.symbol} on block explorer`}
+                              title={`View ${asset.symbol} on block explorer`}
                             >
                               {MINT_ASSET_SOLSCAN_ICON}
                             </a>
@@ -731,7 +755,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                   </div>
                 </div>
                 </div>
-                {(isBurning || burnError || (burnSignature && burnStatus === 'success')) && (
+                {(isBurning || burnError || isBurnConfirmed) && (
                 <div className="grai-burn-feedback-slot">
                   {isBurning ? (
                     <p className="grai-mint-feedback is-pending">Confirming transaction…</p>
@@ -741,7 +765,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     <p className="grai-mint-feedback is-success grai-burn-feedback-confirmed">
                       Burn confirmed:{' '}
                       <a
-                        href={solscanTxUrl(burnSignature!)}
+                        href={explorerTxUrl(burnSignature!) ?? '#'}
                         target="_blank"
                         rel="noreferrer"
                         title={burnSignature!}

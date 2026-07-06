@@ -11,10 +11,11 @@ export function depositValue(
   assetDecimals: number,
   price: bigint,
   priceDecimals: number,
+  usdScale: number = USD_SCALE,
 ): bigint {
   if (depositAmount <= 0n || price <= 0n) return 0n
 
-  const numerator = depositAmount * price * pow10(USD_SCALE)
+  const numerator = depositAmount * price * pow10(usdScale)
   const denominator = pow10(assetDecimals) * pow10(priceDecimals)
   return numerator / denominator
 }

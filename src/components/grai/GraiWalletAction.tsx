@@ -52,7 +52,7 @@ export function GraiWalletActorRow({
   walletCopied,
   onCopyWallet,
   onConnect,
-  solscanAccountUrl,
+  explorerAccountUrl,
 }: {
   label: string
   hint: string
@@ -62,7 +62,7 @@ export function GraiWalletActorRow({
   walletCopied: boolean
   onCopyWallet: () => void
   onConnect: () => void
-  solscanAccountUrl: (address: string) => string
+  explorerAccountUrl?: ((address: string) => string | null) | null
 }) {
   return (
     <p className="grai-mint-feedback-wallet">
@@ -92,12 +92,12 @@ export function GraiWalletActorRow({
               </button>
             </span>
             <a
-              href={solscanAccountUrl(connectedWalletAddress)}
+              href={explorerAccountUrl?.(connectedWalletAddress) ?? '#'}
               target="_blank"
               rel="noreferrer"
               className="grai-mint-asset-trigger-solscan"
-              aria-label="View wallet on Solscan"
-              title="View wallet on Solscan"
+              aria-label="View wallet on block explorer"
+              title="View wallet on block explorer"
             >
               {MINT_ASSET_SOLSCAN_ICON}
             </a>
@@ -119,7 +119,7 @@ export function GraiWalletActorRow({
   )
 }
 
-export function GraiEstimateSuffix({ solscanHref }: { solscanHref?: string | null }) {
+export function GraiEstimateSuffix({ explorerHref }: { explorerHref?: string | null }) {
   return (
     <span className="grai-estimated-amount-suffix">
       <span className="grai-mint-asset-item-icon" aria-hidden="true">
@@ -133,14 +133,14 @@ export function GraiEstimateSuffix({ solscanHref }: { solscanHref?: string | nul
         />
       </span>
       GRAI
-      {solscanHref ? (
+      {explorerHref ? (
         <a
-          href={solscanHref}
+          href={explorerHref}
           target="_blank"
           rel="noreferrer"
           className="grai-mint-asset-value-solscan"
-          aria-label="View GRAI contract on Solscan"
-          title="View GRAI contract on Solscan"
+          aria-label="View GRAI contract on block explorer"
+          title="View GRAI contract on block explorer"
         >
           {MINT_ASSET_SOLSCAN_ICON}
         </a>

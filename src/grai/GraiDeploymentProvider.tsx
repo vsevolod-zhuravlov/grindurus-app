@@ -4,11 +4,15 @@ import { useConnection } from '@solana/wallet-adapter-react'
 import { useWalletContext, type SolanaCluster } from '../providers/AppWalletProvider'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
 import { deferAfterPaint } from '../utils/deferAfterPaint'
+import { useEvmWallet } from '../hooks/useEvmWallet'
 import {
   getDefaultGraiSolanaCluster,
   GraiEvmConfig,
   GraiSolanaConfig,
   GraiSolanaRuntime,
+  evmExplorerAccountUrl,
+  evmExplorerTokenUrl,
+  evmExplorerTxUrl,
   resolveGraiEvmConfig,
   resolveGraiSolanaConfig,
   resolveGraiSolanaRuntime,
@@ -31,16 +35,21 @@ type GraiDeploymentContextValue = {
   isProtocolResolving: boolean
   protocolError: string | null
   clusterMismatch: boolean
+  evmChainMismatch: boolean
   solscanTokenUrl: (mint: string) => string
   solscanTxUrl: (signature: string) => string
   solscanAccountUrl: (address: string) => string
+  explorerTokenUrl: (address: string) => string | null
+  explorerTxUrl: (id: string) => string | null
+  explorerAccountUrl: (address: string) => string | null
 }
 
 const GraiDeploymentContext = createContext<GraiDeploymentContextValue | undefined>(undefined)
 
 export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
   const { selectedChainType, evmChain } = useWalletContext()
-  const { cluster: walletCluster, isConnected } = useSolanaWallet()
+  const { cluster: walletCluster, isConnected: isSolanaConnected } = useSolanaWallet()
+  const evmWallet = useEvmWallet()
   const { connection: walletConnection } = useConnection()
 
   const solanaCluster = getDefaultGraiSolanaCluster()
@@ -75,7 +84,13 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
   }, [evm, selectedChainType, staticSolana])
 
   const clusterMismatch =
-    selectedChainType === 'solana' && isConnected && walletCluster !== null && walletCluster !== solanaCluster
+    selectedChainType === 'solana' && isSolanaConnected && walletCluster !== null && walletCluster !== solanaCluster
+
+  const evmChainMismatch =
+    selectedChainType === 'evm' &&
+    evmWallet.isConnected &&
+    evm !== null &&
+    evmWallet.chainId !== evm.chainId
 
   useEffect(() => {
     if (!connection || !staticSolana) {
@@ -129,13 +144,30 @@ export function GraiDeploymentProvider({ children }: { children: ReactNode }) {
       isProtocolResolving,
       protocolError,
       clusterMismatch,
+      evmChainMismatch,
       solscanTokenUrl: (mint: string) => solscanTokenUrl(solanaCluster, mint),
       solscanTxUrl: (signature: string) => solscanTxUrl(solanaCluster, signature),
       solscanAccountUrl: (address: string) => solscanAccountUrl(solanaCluster, address),
+      explorerTokenUrl: (address: string) => {
+        if (chainKind === 'evm' && evm) return evmExplorerTokenUrl(evm.chainId, address)
+        if (chainKind === 'solana') return solscanTokenUrl(solanaCluster, address)
+        return null
+      },
+      explorerTxUrl: (id: string) => {
+        if (chainKind === 'evm' && evm) return evmExplorerTxUrl(evm.chainId, id)
+        if (chainKind === 'solana') return solscanTxUrl(solanaCluster, id)
+        return null
+      },
+      explorerAccountUrl: (address: string) => {
+        if (chainKind === 'evm' && evm) return evmExplorerAccountUrl(evm.chainId, address)
+        if (chainKind === 'solana') return solscanAccountUrl(solanaCluster, address)
+        return null
+      },
     }),
     [
       chainKind,
       clusterMismatch,
+      evmChainMismatch,
       connection,
       evm,
       hasStaticConfig,

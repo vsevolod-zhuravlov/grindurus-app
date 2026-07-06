@@ -185,7 +185,7 @@ export function GraiGrinderYieldValue({
       structured
       tooltipClassName="is-breakdown"
     >
-      + {formatGrinderUsdTotal(totalUsd)}
+      {formatGrinderUsdTotal(totalUsd)}
     </GraiFieldInfoButton>
   )
 }
@@ -235,7 +235,8 @@ export function GraiGrinderCountValue({
       ariaLabel={`${active} of ${total} grinders active`}
       structured
     >
-      {active}/{total} GRINDERS
+      {active}/{total}{' '}
+      <span className="grai-grinders-group-general-value-label">GRINDERS</span>
     </GraiFieldInfoButton>
   )
 }

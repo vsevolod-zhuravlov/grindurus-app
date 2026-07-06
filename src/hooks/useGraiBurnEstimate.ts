@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react'
+import { estimateEvmGraiBurnOutputs } from '../grai/evm/estimateBurn'
+import { GRAI_DECIMALS_EVM } from '../grai/evm/constants'
 import { estimateGraiBurnOutputs, type GraiBurnOutputEstimate } from '../grai/estimateGraiBurn'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { GRAI_DECIMALS } from '../grai/tokenomics'
 
 export function useGraiBurnEstimate(graiAmountInput: string, enabled: boolean) {
-  const { connection, solana, isConfigured } = useGraiDeployment()
+  const { connection, solana, evm, chainKind, isConfigured } = useGraiDeployment()
   const [burnOutputs, setBurnOutputs] = useState<GraiBurnOutputEstimate[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
+  const graiDecimals = chainKind === 'evm' ? GRAI_DECIMALS_EVM : GRAI_DECIMALS
+
   useEffect(() => {
-    if (!enabled || !graiAmountInput.trim() || !connection || !solana || !isConfigured) {
+    if (!enabled || !graiAmountInput.trim() || !isConfigured) {
+      setBurnOutputs([])
+      setIsLoading(false)
+      return
+    }
+
+    const isSolanaReady = chainKind === 'solana' && connection && solana
+    const isEvmReady = chainKind === 'evm' && evm
+    if (!isSolanaReady && !isEvmReady) {
       setBurnOutputs([])
       setIsLoading(false)
       return
@@ -18,7 +30,12 @@ export function useGraiBurnEstimate(graiAmountInput: string, enabled: boolean) {
     let cancelled = false
     const timer = window.setTimeout(() => {
       setIsLoading(true)
-      void estimateGraiBurnOutputs(graiAmountInput, GRAI_DECIMALS, connection, solana)
+      const estimatePromise =
+        chainKind === 'evm' && evm
+          ? estimateEvmGraiBurnOutputs(evm, graiAmountInput, graiDecimals)
+          : estimateGraiBurnOutputs(graiAmountInput, graiDecimals, connection!, solana!)
+
+      void estimatePromise
         .then((outputs) => {
           if (cancelled) return
           setBurnOutputs(outputs ?? [])
@@ -35,7 +52,7 @@ export function useGraiBurnEstimate(graiAmountInput: string, enabled: boolean) {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [connection, enabled, graiAmountInput, isConfigured, solana])
+  }, [chainKind, connection, enabled, evm, graiAmountInput, graiDecimals, isConfigured, solana])
 
   return { burnOutputs, isLoading }
 }

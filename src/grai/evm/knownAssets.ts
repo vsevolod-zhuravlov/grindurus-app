@@ -1,0 +1,56 @@
+import type { GraiAsset, GraiAssetIcon } from '../knownMints'
+import { NATIVE_EVM_ASSET } from './constants'
+
+const COINGECKO = {
+  usdc: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+  eth: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+  usdt: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+  weth: 'https://assets.coingecko.com/coins/images/2518/small/weth.png',
+} as const
+
+export const KNOWN_EVM_ASSET_METADATA: Record<string, { symbol: string; icon: GraiAssetIcon }> = {
+  [NATIVE_EVM_ASSET]: { symbol: 'ETH', icon: { src: COINGECKO.eth, alt: 'ETH' } },
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': {
+    symbol: 'USDC',
+    icon: { src: COINGECKO.usdc, alt: 'USDC' },
+  },
+  '0x1c7d4b196cb0c7b98cdad4a398ef40f4bd30d3a9': {
+    symbol: 'USDC',
+    icon: { src: COINGECKO.usdc, alt: 'USDC' },
+  },
+  '0xdac17f958d2ee523a2206206994597c13d831ec7': {
+    symbol: 'USDT',
+    icon: { src: COINGECKO.usdt, alt: 'USDT' },
+  },
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': {
+    symbol: 'WETH',
+    icon: { src: COINGECKO.weth, alt: 'WETH' },
+  },
+  '0x4200000000000000000000000000000000000006': {
+    symbol: 'WETH',
+    icon: { src: COINGECKO.weth, alt: 'WETH' },
+  },
+}
+
+export function normalizeEvmAssetAddress(address: string): string {
+  return address.toLowerCase()
+}
+
+export function isNativeEvmAsset(address: string): boolean {
+  return normalizeEvmAssetAddress(address) === NATIVE_EVM_ASSET
+}
+
+export function resolveEvmGraiAsset(address: string): GraiAsset {
+  const normalized = normalizeEvmAssetAddress(address)
+  const known = KNOWN_EVM_ASSET_METADATA[normalized]
+  if (known) {
+    return { mint: normalized, symbol: known.symbol, icon: known.icon }
+  }
+
+  const short = `${address.slice(0, 6)}…${address.slice(-4)}`
+  return {
+    mint: normalized,
+    symbol: short.toUpperCase(),
+    icon: { src: COINGECKO.usdc, alt: short },
+  }
+}

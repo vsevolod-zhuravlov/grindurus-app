@@ -12,6 +12,11 @@ import { fetchGraiRegistryAssets } from '../grai/fetchAssets'
 import { fetchGraiVaultBalances, type GraiAssetVaultBalances } from '../grai/fetchVaultBalances'
 import { fetchGraiMintSupply } from '../grai/fetchGraiMintSupply'
 import {
+  fetchEvmGraiAssets,
+  fetchEvmGraiTotalSupply,
+  fetchEvmGraiVaultBalances,
+} from '../grai/evm/readProtocol'
+import {
   fetchGrinderCustodyHoldings,
   indexGrinderCustodyHoldings,
   mergeGrinderCustodyHoldings,
@@ -26,8 +31,8 @@ import {
   toGrinderCustodyRow,
   parseCustodyWallet,
 } from '../grai/grinderCustodyState'
-import { useWalletContext } from './AppWalletProvider'
 import { useSolanaWallet } from '../hooks/useSolanaWallet'
+import { useEvmWallet } from '../hooks/useEvmWallet'
 
 type GraiDataContextValue = {
   assets: GraiAsset[]
@@ -54,11 +59,12 @@ type GraiDataContextValue = {
 const GraiDataContext = createContext<GraiDataContextValue | undefined>(undefined)
 
 export function GraiDataProvider({ children }: { children: ReactNode }) {
-  const { selectedChainType } = useWalletContext()
-  const { isConnected } = useSolanaWallet()
-  const { connection, solana, hasStaticConfig, isConfigured } = useGraiDeployment()
+  const { isConnected: isSolanaConnected } = useSolanaWallet()
+  const { isConnected: isEvmConnected } = useEvmWallet()
+  const { connection, solana, evm, chainKind, hasStaticConfig, isConfigured } = useGraiDeployment()
 
-  const isWalletReady = selectedChainType === 'solana' && isConnected
+  const isWalletReady =
+    (chainKind === 'solana' && isSolanaConnected) || (chainKind === 'evm' && isEvmConnected)
 
   const [assets, setAssets] = useState<GraiAsset[]>([])
   const [assetsLoading, setAssetsLoading] = useState(true)
@@ -81,6 +87,31 @@ export function GraiDataProvider({ children }: { children: ReactNode }) {
   const [custodyEnabled, setCustodyEnabled] = useState(false)
 
   const refreshAssets = useCallback(async () => {
+    if (chainKind === 'evm') {
+      if (!evm) {
+        setAssets([])
+        setIsRegistryLoaded(false)
+        setAssetsError('GRAI is not configured for this EVM network')
+        setAssetsLoading(false)
+        return
+      }
+
+      setAssetsLoading(true)
+      setAssetsError(null)
+      try {
+        const registryAssets = await fetchEvmGraiAssets(evm)
+        setAssets(registryAssets)
+        setIsRegistryLoaded(registryAssets.length > 0)
+      } catch (err) {
+        setAssets([])
+        setIsRegistryLoaded(false)
+        setAssetsError(err instanceof Error ? err.message : 'Failed to load GRAI assets')
+      } finally {
+        setAssetsLoading(false)
+      }
+      return
+    }
+
     if (!hasStaticConfig) {
       setAssets([])
       setIsRegistryLoaded(false)
@@ -106,9 +137,31 @@ export function GraiDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setAssetsLoading(false)
     }
-  }, [connection, hasStaticConfig, solana])
+  }, [chainKind, connection, evm, hasStaticConfig, solana])
 
   const refreshVaultBalances = useCallback(async () => {
+    if (chainKind === 'evm') {
+      if (!evm) {
+        setVaultBalances({})
+        setVaultBalancesError('GRAI is not configured for this EVM network')
+        setVaultBalancesLoading(false)
+        return
+      }
+
+      setVaultBalancesLoading(true)
+      setVaultBalancesError(null)
+      try {
+        const balances = await fetchEvmGraiVaultBalances(evm)
+        setVaultBalances(balances)
+      } catch (err) {
+        setVaultBalances({})
+        setVaultBalancesError(err instanceof Error ? err.message : 'Failed to load vault balances')
+      } finally {
+        setVaultBalancesLoading(false)
+      }
+      return
+    }
+
     if (!hasStaticConfig) {
       setVaultBalances({})
       setVaultBalancesError('GRAI is not configured for this network')
@@ -131,9 +184,31 @@ export function GraiDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setVaultBalancesLoading(false)
     }
-  }, [connection, hasStaticConfig, solana])
+  }, [chainKind, connection, evm, hasStaticConfig, solana])
 
   const refreshTotalSupply = useCallback(async () => {
+    if (chainKind === 'evm') {
+      if (!evm) {
+        setTotalSupplyLabel('—')
+        setTotalSupplyError('GRAI is not configured for this EVM network')
+        setTotalSupplyLoading(false)
+        return
+      }
+
+      setTotalSupplyLoading(true)
+      setTotalSupplyError(null)
+      try {
+        const supply = await fetchEvmGraiTotalSupply(evm)
+        setTotalSupplyLabel(supply.label)
+      } catch (err) {
+        setTotalSupplyLabel('—')
+        setTotalSupplyError(err instanceof Error ? err.message : 'Failed to load GRAI total supply')
+      } finally {
+        setTotalSupplyLoading(false)
+      }
+      return
+    }
+
     if (!hasStaticConfig) {
       setTotalSupplyLabel('—')
       setTotalSupplyError('GRAI is not configured for this network')
@@ -156,7 +231,7 @@ export function GraiDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setTotalSupplyLoading(false)
     }
-  }, [connection, hasStaticConfig, solana])
+  }, [chainKind, connection, evm, hasStaticConfig, solana])
 
   const refreshGrindersCustody = useCallback(async () => {
     const grinders = grindersRef.current

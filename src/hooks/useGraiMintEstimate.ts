@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PublicKey } from '@solana/web3.js'
+import { estimateEvmGraiMintOutput } from '../grai/evm/estimateMint'
+import { GRAI_DECIMALS_EVM } from '../grai/evm/constants'
 import { estimateGraiMintOutput } from '../grai/estimateGraiMint'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { formatTokenBalance } from '../grai/onchain'
@@ -17,7 +19,7 @@ export function useGraiMintEstimate(
   amountInput: string,
   assetDecimals: number | null,
 ) {
-  const { connection, solana, isConfigured } = useGraiDeployment()
+  const { connection, solana, evm, chainKind, isConfigured } = useGraiDeployment()
   const [estimatedGrai, setEstimatedGrai] = useState<string | null>(null)
   const [seniorShareLabel, setSeniorShareLabel] = useState<string | null>(null)
   const [juniorShareLabel, setJuniorShareLabel] = useState<string | null>(null)
@@ -25,8 +27,22 @@ export function useGraiMintEstimate(
   const [juniorShareUsdRaw, setJuniorShareUsdRaw] = useState<bigint>(0n)
   const [isLoading, setIsLoading] = useState(false)
 
+  const graiDecimals = chainKind === 'evm' ? GRAI_DECIMALS_EVM : GRAI_DECIMALS
+
   useEffect(() => {
-    if (!assetMint || assetDecimals === null || !amountInput.trim() || !connection || !solana || !isConfigured) {
+    if (!assetMint || assetDecimals === null || !amountInput.trim() || !isConfigured) {
+      setEstimatedGrai(null)
+      setSeniorShareLabel(null)
+      setJuniorShareLabel(null)
+      setSeniorShareUsdRaw(0n)
+      setJuniorShareUsdRaw(0n)
+      setIsLoading(false)
+      return
+    }
+
+    const isSolanaReady = chainKind === 'solana' && connection && solana
+    const isEvmReady = chainKind === 'evm' && evm
+    if (!isSolanaReady && !isEvmReady) {
       setEstimatedGrai(null)
       setSeniorShareLabel(null)
       setJuniorShareLabel(null)
@@ -39,7 +55,18 @@ export function useGraiMintEstimate(
     let cancelled = false
     const timer = window.setTimeout(() => {
       setIsLoading(true)
-      void estimateGraiMintOutput(new PublicKey(assetMint), amountInput, assetDecimals, connection, solana)
+      const estimatePromise =
+        chainKind === 'evm' && evm
+          ? estimateEvmGraiMintOutput(evm, assetMint, amountInput, assetDecimals)
+          : estimateGraiMintOutput(
+              new PublicKey(assetMint),
+              amountInput,
+              assetDecimals,
+              connection!,
+              solana!,
+            )
+
+      void estimatePromise
         .then((estimate) => {
           if (cancelled) return
           if (estimate === null) {
@@ -50,7 +77,7 @@ export function useGraiMintEstimate(
             setJuniorShareUsdRaw(0n)
             return
           }
-          setEstimatedGrai(formatTokenBalance(estimate.graiRaw, GRAI_DECIMALS))
+          setEstimatedGrai(formatTokenBalance(estimate.graiRaw, graiDecimals))
           setSeniorShareLabel(formatMintShareLabel(estimate.seniorRaw, assetDecimals))
           setJuniorShareLabel(formatMintShareLabel(estimate.juniorRaw, assetDecimals))
           setSeniorShareUsdRaw(estimate.seniorUsdRaw)
@@ -74,7 +101,7 @@ export function useGraiMintEstimate(
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [amountInput, assetDecimals, assetMint, connection, isConfigured, solana])
+  }, [amountInput, assetDecimals, assetMint, chainKind, connection, evm, graiDecimals, isConfigured, solana])
 
   return { estimatedGrai, seniorShareLabel, juniorShareLabel, seniorShareUsdRaw, juniorShareUsdRaw, isLoading }
 }

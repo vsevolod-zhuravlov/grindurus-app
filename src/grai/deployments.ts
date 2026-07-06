@@ -213,3 +213,21 @@ export function evmExplorerTokenUrl(chainId: number, token: string): string | nu
   if (chainId === 84532) return `https://sepolia.basescan.org/token/${token}`
   return null
 }
+
+export function evmExplorerTxUrl(chainId: number, hash: string): string | null {
+  if (chainId === 1) return `https://etherscan.io/tx/${hash}`
+  if (chainId === 8453) return `https://basescan.org/tx/${hash}`
+  if (chainId === 42161) return `https://arbiscan.io/tx/${hash}`
+  if (chainId === 11155111) return `https://sepolia.etherscan.io/tx/${hash}`
+  if (chainId === 84532) return `https://sepolia.basescan.org/tx/${hash}`
+  return null
+}
+
+export function evmExplorerAccountUrl(chainId: number, address: string): string | null {
+  if (chainId === 1) return `https://etherscan.io/address/${address}`
+  if (chainId === 8453) return `https://basescan.org/address/${address}`
+  if (chainId === 42161) return `https://arbiscan.io/address/${address}`
+  if (chainId === 11155111) return `https://sepolia.etherscan.io/address/${address}`
+  if (chainId === 84532) return `https://sepolia.basescan.org/address/${address}`
+  return null
+}

@@ -21,7 +21,7 @@ function TokenFlowLoading() {
 }
 
 function GraiPage() {
-  const { clusterMismatch, solanaCluster, hasStaticConfig, protocolError } = useGraiDeployment()
+  const { clusterMismatch, evmChainMismatch, solanaCluster, chainKind, evm, hasStaticConfig, isConfigured, protocolError } = useGraiDeployment()
   const [actionView, setActionView] = useState<'mint' | 'burn'>('mint')
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
   const [isTokenFlowMounted, setIsTokenFlowMounted] = useState(false)
@@ -171,16 +171,31 @@ function GraiPage() {
         </div>
       </div>
 
-      {(clusterMismatch || !hasStaticConfig || protocolError) && (
+      {(clusterMismatch || evmChainMismatch || !isConfigured || protocolError) && (
         <div className="grai-page-meta">
           {clusterMismatch && (
             <p className="grai-page-network-warning" role="status">
               Switch your Solana wallet to {solanaCluster === 'mainnet-beta' ? 'Mainnet' : solanaCluster} to mint or burn GRAI.
             </p>
           )}
-          {!hasStaticConfig && (
+          {evmChainMismatch && evm && (
+            <p className="grai-page-network-warning" role="status">
+              Switch your EVM wallet to {evm.chainName} to mint or burn GRAI.
+            </p>
+          )}
+          {!isConfigured && chainKind === null && (
             <p className="grai-page-network-warning" role="status">
               GRAI is not configured for this network. Set deployment env vars before using the app.
+            </p>
+          )}
+          {!isConfigured && chainKind === 'evm' && (
+            <p className="grai-page-network-warning" role="status">
+              GRAI is not configured for this EVM network. Set VITE_GRAI_*_TOKEN and VITE_GRAI_*_PROTOCOL env vars.
+            </p>
+          )}
+          {!isConfigured && chainKind === 'solana' && !hasStaticConfig && (
+            <p className="grai-page-network-warning" role="status">
+              GRAI is not configured for this Solana cluster. Set deployment env vars before using the app.
             </p>
           )}
           {protocolError && (

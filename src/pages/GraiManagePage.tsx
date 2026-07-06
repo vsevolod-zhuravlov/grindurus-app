@@ -1130,7 +1130,11 @@ export function GraiManageSection() {
 
         <div className="grai-manage-cards">
         <section className="grai-manage-card grai-manage-action-card" aria-label="Allocate or distribute capital">
-          <div className="grai-action-switch" role="tablist" aria-label="Allocate or distribute">
+          <div
+            className={`grai-action-switch is-${manageActionView}-active`}
+            role="tablist"
+            aria-label="Allocate or distribute"
+          >
             <button
               type="button"
               role="tab"
