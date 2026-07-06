@@ -364,6 +364,20 @@
   gap: 1rem;
 }
 
+.header-wallet-cluster {
+  --header-wallet-cluster-gap: 1rem;
+  --header-wallet-accent-border: #c06090;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--header-wallet-cluster-gap);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .header-wallet-cluster {
+  --header-wallet-accent-border: #b0557a;
+}
+
 .my-grinders-btn {
   display: flex;
   align-items: center;
@@ -383,92 +397,6 @@
   background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
   color: white;
   box-shadow: 0 4px 20px rgba(255, 105, 180, 0.5);
-}
-
-.theme-toggle {
-  position: relative;
-}
-
-.theme-toggle-btn {
-  width: 39px;
-  height: 39px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-secondary);
-  border: 2px solid #ff69b4;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  transition: all 0.2s ease;
-}
-
-.theme-toggle-btn:hover {
-  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-  border-color: #ff69b4;
-}
-
-.theme-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.2s ease;
-  min-width: 140px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  z-index: 100;
-}
-
-.theme-toggle:hover .theme-dropdown {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.theme-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  transition: all 0.15s ease;
-  text-align: left;
-}
-
-.theme-option:hover {
-  background: var(--bg-tertiary);
-}
-
-.theme-option.active {
-  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-  color: white;
-}
-
-.theme-dropdown-divider {
-  height: 1px;
-  margin: 2px 4px;
-  background: var(--border-color);
-}
-
-.theme-option--sound.is-on {
-  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-  color: white;
 }
 
 @media (max-width: 768px) {
@@ -521,12 +449,6 @@
     font-size: 0.78rem;
   }
 
-  .theme-toggle-btn {
-    width: var(--header-control-size);
-    height: var(--header-control-size);
-    font-size: 1rem;
-    border-radius: 10px;
-  }
 }
 
 @media (max-width: 480px) {
