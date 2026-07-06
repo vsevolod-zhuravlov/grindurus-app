@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ThemeToggle } from './ThemeToggle'
 import { ConnectWalletButton } from './ConnectWalletButton'
+import { HeaderSettingsPopover } from './HeaderSettingsPopover'
 import { assetUrl } from '../utils/appPaths'
 import {
   navigateToGraiSection,
@@ -277,8 +277,10 @@ function Header({ activeView, onViewChange }: HeaderProps) {
               ← GrindURUS
             </a>
           )}
-          <ConnectWalletButton />
-          <ThemeToggle />
+          <div className="header-wallet-cluster">
+            <ConnectWalletButton />
+            <HeaderSettingsPopover />
+          </div>
         </div>
       </div>
     </header>
