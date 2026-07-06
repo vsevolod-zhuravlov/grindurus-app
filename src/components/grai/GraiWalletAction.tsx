@@ -7,10 +7,12 @@ export function GraiWalletBalanceSlot({
   label,
   symbol,
   isConnected,
+  explorerHref,
 }: {
   label: string
   symbol?: string
   isConnected: boolean
+  explorerHref?: string | null
 }) {
   if (!isConnected) {
     return (
@@ -33,7 +35,21 @@ export function GraiWalletBalanceSlot({
         {trimmedSymbol ? (
           <>
             <span className="grai-wallet-balance-amount">{amount}</span>
-            <span className="grai-wallet-balance-symbol">{trimmedSymbol}</span>
+            <span className="grai-wallet-balance-symbol-wrap">
+              <span className="grai-wallet-balance-symbol">{trimmedSymbol}</span>
+              {explorerHref ? (
+                <a
+                  href={explorerHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="grai-mint-asset-trigger-solscan"
+                  aria-label={`View ${trimmedSymbol} on block explorer`}
+                  title={`View ${trimmedSymbol} on block explorer`}
+                >
+                  {MINT_ASSET_SOLSCAN_ICON}
+                </a>
+              ) : null}
+            </span>
           </>
         ) : (
           label

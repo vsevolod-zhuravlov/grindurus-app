@@ -43,40 +43,12 @@
   height: 1.5rem;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: linear-gradient(
-    120deg,
-    #ff69b4 0%,
-    #ff7dbc 22%,
-    #ff1493 45%,
-    #ff5fb1 68%,
-    #ff69b4 100%
-  );
-  background-size: 220% 220%;
-  animation: wallet-expand-gradient-flow 4.5s ease-in-out infinite;
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(255, 105, 180, 0.3);
+  border-radius: 0;
+  background: transparent;
+  color: #ff69b4;
+  box-shadow: none;
   box-sizing: border-box;
-  transition: box-shadow 0.2s ease, color 0.2s ease;
-}
-
-@keyframes wallet-expand-gradient-flow {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wallet-expand-toggle {
-    animation: none;
-    background-size: auto;
-    background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
-  }
+  transition: color 0.2s ease;
 }
 
 .wallet-expand-toggle-icon {
@@ -87,12 +59,11 @@
 }
 
 .wallet-expand-toggle.is-collapsed .wallet-expand-toggle-icon {
-  transform: rotate(-90deg);
+  transform: rotate(90deg);
 }
 
 .wallet-info-btn:hover .wallet-expand-toggle {
-  color: #fff;
-  box-shadow: 0 3px 14px rgba(255, 105, 180, 0.42);
+  color: #ff69b4;
 }
 
 .connect-wallet-btn:hover:not(:disabled) {
@@ -1115,8 +1086,10 @@ html:has(body[data-scroll-locked]) body {
 }
 
 .wallet-network-select-arrow {
-  color: rgba(255, 255, 255, 0.55);
-  transition: transform 0.2s ease;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #ff69b4;
+  transition: transform 0.2s ease, color 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -1609,6 +1582,11 @@ html:has(body[data-scroll-locked]) body {
   background: rgba(255, 105, 180, 0.08);
 }
 
+[data-theme="light"] .wallet-expand-toggle,
+[data-theme="light"] .wallet-info-btn:hover .wallet-expand-toggle {
+  color: #e91e8c;
+}
+
 [data-theme="light"] .wallet-address {
   color: rgba(0, 0, 0, 0.85);
 }
@@ -1646,7 +1624,7 @@ html:has(body[data-scroll-locked]) body {
 }
 
 [data-theme="light"] .wallet-network-select-arrow {
-  color: rgba(0, 0, 0, 0.45);
+  color: #e91e8c;
 }
 
 [data-theme="light"] .wallet-network-select-list {

@@ -75,6 +75,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   const [minterWalletCopied, setMinterWalletCopied] = useState(false)
   const [burnAmount, setBurnAmount] = useState('')
   const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
+  const [isMintSplitSharesHidden, setIsMintSplitSharesHidden] = useState(false)
+  const [isBurnTxResultHidden, setIsBurnTxResultHidden] = useState(false)
   const mintAssetMenuRef = useRef<HTMLDivElement>(null)
   const bullSoundPlayedForRef = useRef<string | null>(null)
 
@@ -270,6 +272,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     label={balanceLabel}
                     symbol={selectedAsset?.symbol}
                     isConnected={isWalletConnected}
+                    explorerHref={selectedAsset?.mint ? explorerTokenUrl(selectedAsset.mint) : null}
                   />
                 </div>
                 <div className="grai-mint-amount-field">
@@ -396,30 +399,52 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                       </div>
                     </div>
                   </div>
-                  <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
+                  <button
+                    type="button"
+                    className={`grai-mint-amount-flow-arrow${isMintSplitSharesHidden ? ' is-collapsed' : ''}`}
+                    onClick={() => setIsMintSplitSharesHidden((hidden) => !hidden)}
+                    aria-expanded={!isMintSplitSharesHidden}
+                    aria-controls="grai-mint-split-shares"
+                    aria-label={
+                      isMintSplitSharesHidden
+                        ? 'Show mint result breakdown'
+                        : 'Hide mint result breakdown'
+                    }
+                  >
+                    <span className="grai-mint-amount-flow-arrow-inner">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                      <span className="grai-mint-amount-flow-arrow-label" aria-hidden="true">
+                        TX RESULT
+                      </span>
+                    </span>
+                  </button>
                   {!isMinting && !mintError && !(mintSignature && mintStatus === 'success') ? (
                     <div className="grai-mint-split-shares-hint is-open" aria-label="Mint deposit split estimate">
+                      <div
+                        className={`grai-burn-assets-rows-panel${isMintSplitSharesHidden ? '' : ' is-open'}`}
+                        aria-hidden={isMintSplitSharesHidden}
+                      >
+                        <div className="grai-burn-assets-rows-panel-inner">
                         <div id="grai-mint-split-shares" className="grai-burn-assets-rows">
                           <div className="grai-burn-assets-row grai-mint-estimate-row">
                             <span className="grai-burn-assets-amount">
                               <span className="grai-estimated-amount-prefix" aria-label="Amount">
-                                <span className="grai-field-label-icon" aria-hidden="true">
-                                  <WalletIcon size={14} />
-                                </span>
-                                <span className="grai-estimated-amount-prefix-label">MINTER</span>
                                 <span className="grai-estimated-amount-prefix-plus" aria-hidden="true">
                                   {AMOUNT_PREFIX_PLUS_ICON}
+                                </span>
+                                <span className="grai-estimated-amount-prefix-label">MINTER</span>
+                                <span className="grai-mint-split-vault-plus" aria-hidden="true">
+                                  {VAULT_AMOUNT_PLUS_ICON}
                                 </span>
                                 {mintAmount.trim() && (isEstimateLoading || estimatedGrai !== null) ? (
                                   <span className="grai-estimated-amount-value">
@@ -503,6 +528,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                       </div>
                     ))}
                         </div>
+                        </div>
+                      </div>
                       </div>
                   ) : null}
                 </div>
@@ -565,6 +592,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                       label={graiBalanceLabel}
                       symbol="GRAI"
                       isConnected={isWalletConnected}
+                      explorerHref={graiExplorerHref}
                     />
                   </div>
                 <div className="grai-mint-amount-field">
@@ -623,21 +651,44 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                       )}
                     </span>
                   </div>
-                  <div className="grai-mint-amount-flow-arrow" aria-hidden="true">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
-                  <div className="grai-burn-assets-section-title">
+                  <button
+                    type="button"
+                    className={`grai-mint-amount-flow-arrow${isBurnTxResultHidden ? ' is-collapsed' : ''}`}
+                    onClick={() => setIsBurnTxResultHidden((hidden) => !hidden)}
+                    aria-expanded={!isBurnTxResultHidden}
+                    aria-controls="grai-burn-tx-result"
+                    aria-label={
+                      isBurnTxResultHidden
+                        ? 'Show burn transaction result'
+                        : 'Hide burn transaction result'
+                    }
+                  >
+                    <span className="grai-mint-amount-flow-arrow-inner">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                      <span className="grai-mint-amount-flow-arrow-label" aria-hidden="true">
+                        TX RESULT
+                      </span>
+                    </span>
+                  </button>
+                  <div
+                    className={`grai-burn-assets-rows-panel grai-burn-tx-result-panel${isBurnTxResultHidden ? '' : ' is-open'}`}
+                    id="grai-burn-tx-result"
+                    aria-hidden={isBurnTxResultHidden}
+                  >
+                    <div className="grai-burn-assets-rows-panel-inner">
+                  <div className="grai-burn-assets-hint is-open" aria-label="Burn outputs estimate">
+                  <div className="grai-burn-assets-rows grai-burn-tx-result-rows">
+                  <div className="grai-burn-assets-section-title grai-burn-assets-row grai-burn-estimate-title-row">
                     {isBurnConfirmed ? (
                       <span className="grai-burn-confirmed-title">
                         BURNT{' '}
@@ -645,62 +696,56 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                         GRAI
                       </span>
                     ) : (
-                      <>
+                      <span className="grai-burn-assets-amount">
                         <span className="grai-estimated-amount-prefix" aria-label="Burner">
-                          <button
-                            type="button"
-                            className={`grai-donut-legend-toggle grai-burn-assets-section-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
-                            onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
-                            aria-expanded={!isBurnAssetsRowsHidden}
-                            aria-controls="grai-burn-assets-rows"
-                            aria-label={
-                              isBurnAssetsRowsHidden
-                                ? 'Show senior vault shares breakdown'
-                                : 'Hide senior vault shares breakdown'
-                            }
-                          >
-                            <svg
-                              className="grai-donut-legend-toggle-icon"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M6 9l6 6 6-6" />
-                            </svg>
-                          </button>
                           {!isBurning && !burnError ? (
                             <>
-                              BURNER
-                              <span className="grai-burn-estimate-sigma" aria-hidden="true">
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                className={`grai-burn-estimate-sigma grai-burn-assets-section-toggle ${isBurnAssetsRowsHidden ? 'is-collapsed' : ''}`}
+                                onClick={() => setIsBurnAssetsRowsHidden((hidden) => !hidden)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    setIsBurnAssetsRowsHidden((hidden) => !hidden)
+                                  }
+                                }}
+                                aria-expanded={!isBurnAssetsRowsHidden}
+                                aria-controls="grai-burn-assets-rows"
+                                aria-label={
+                                  isBurnAssetsRowsHidden
+                                    ? 'Show senior vault shares breakdown'
+                                    : 'Hide senior vault shares breakdown'
+                                }
+                              >
                                 Σ
+                              </span>
+                              <span className="grai-estimated-amount-prefix-label">BURNER</span>
+                              <span className="grai-mint-split-vault-plus" aria-hidden="true">
+                                {VAULT_AMOUNT_PLUS_ICON}
+                              </span>
+                              <span
+                                className={`grai-burn-estimate-value${
+                                  !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
+                                    ? ' is-placeholder'
+                                    : ''
+                                }`}
+                              >
+                                {burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—') ? (
+                                  isBurnEstimateLoading ? (
+                                    <span className="grai-estimate-spinner" aria-label="Calculating burn value estimate" />
+                                  ) : (
+                                    `~${burnTotalUsdLabel}`
+                                  )
+                                ) : (
+                                  '$0'
+                                )}
                               </span>
                             </>
                           ) : null}
                         </span>
-                        {!isBurning && !burnError ? (
-                          <span
-                            className={`grai-burn-estimate-value${
-                              !(burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—'))
-                                ? ' is-placeholder'
-                                : ''
-                            }`}
-                          >
-                            {burnAmount.trim() && (isBurnEstimateLoading || burnTotalUsdLabel !== '—') ? (
-                              isBurnEstimateLoading ? (
-                                <span className="grai-estimate-spinner" aria-label="Calculating burn value estimate" />
-                              ) : (
-                                `~${burnTotalUsdLabel}`
-                              )
-                            ) : (
-                              '$0'
-                            )}
-                          </span>
-                        ) : null}
-                      </>
+                      </span>
                     )}
                   </div>
                   <div
@@ -752,6 +797,10 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     })}
                       </div>
                     </div>
+                  </div>
+                </div>
+                    </div>
+                  </div>
                   </div>
                 </div>
                 </div>
