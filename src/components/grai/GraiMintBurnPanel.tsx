@@ -88,14 +88,14 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
 
   const usdScale = chainKind === 'evm' ? GRAI_DECIMALS_EVM : USD_SCALE
   const mintUsdLabel = useMemo(() => {
-    if (!amount.trim()) return '0.00$'
+    if (!amount.trim()) return '$0.00'
     if (isEstimateLoading) return '…'
     const totalUsd = seniorShareUsdRaw + juniorShareUsdRaw
-    if (totalUsd <= 0n) return '0.00$'
-    return `${formatVaultBalanceDisplay(totalUsd, usdScale, 2)}$`
+    if (totalUsd <= 0n) return '$0.00'
+    return `$${formatVaultBalanceDisplay(totalUsd, usdScale, 2)}`
   }, [amount, isEstimateLoading, juniorShareUsdRaw, seniorShareUsdRaw, usdScale])
 
-  const redeemUsdLabel = `${mockEstimateRedeemUsd(amount)}$`
+  const redeemUsdLabel = `$${mockEstimateRedeemUsd(amount)}`
 
   const mintedGraiLabel = !amount.trim()
     ? '0.00'
@@ -148,7 +148,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
         <div className="grai-action-content">
           <GraiAmountInput
             key={actionView}
-            label="Assets to give"
+            label={actionView === 'mint' ? 'Asset Amount' : 'Token Amount'}
             assets={actionView === 'mint' ? mintAssetOptions : redeemAssetOptions}
             defaultAsset={actionView === 'mint' ? mintAssetOptions[0]?.symbol : 'GRAI'}
             value={amount}

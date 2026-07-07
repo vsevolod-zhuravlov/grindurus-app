@@ -8087,12 +8087,11 @@
 }
 
 .grai-action-switch--buttons .grai-action-switch-btn.is-active {
-  background: #ab2bab;
   color: #fff;
+  border-bottom: 2px solid #ff69b4;
 }
 
 [data-theme='light'] .grai-action-switch--buttons .grai-action-switch-btn.is-active {
-  background: #ab2bab;
   color: #fff;
 }
 
