@@ -182,6 +182,9 @@ export function GraiGrindersSection() {
         aria-label={isBossEndpointsOpen ? 'Hide endpoints' : 'View endpoints'}
       >
         <span className="grai-grinders-section-toggle-inner">
+          <span className="grai-grinders-section-toggle-label" aria-hidden="true">
+            VIEW ENDPOINTS
+          </span>
           <svg
             className="grai-donut-legend-toggle-icon"
             viewBox="0 0 24 24"
@@ -194,9 +197,6 @@ export function GraiGrindersSection() {
           >
             <path d="M6 9l6 6 6-6" />
           </svg>
-          <span className="grai-grinders-section-toggle-label" aria-hidden="true">
-            VIEW ENDPOINTS
-          </span>
         </span>
       </button>
     </div>
@@ -206,20 +206,6 @@ export function GraiGrindersSection() {
     <div className="grai-bottom-row">
       <div className="grai-grinders-summary-shell" id="grai-grinders-summary">
         {grindersSummaryFilterRow}
-        {bossEndpointsToggle}
-        <div
-          id="grai-boss-endpoints-panel"
-          className={`grai-boss-endpoints-panel${isBossEndpointsOpen ? ' is-open' : ''}`}
-          aria-hidden={!isBossEndpointsOpen}
-        >
-          <div className="grai-boss-endpoints-panel-inner">
-            {shouldMountBossEndpoints ? (
-              <Suspense fallback={<span className="grai-boss-endpoints-status">Loading endpoints…</span>}>
-                <BossEndpointsTable endpoints={bossEndpoints} />
-              </Suspense>
-            ) : null}
-          </div>
-        </div>
         <div className="grai-grinders-row grai-grinders-row--group grai-grinders-row--summary" role="row">
           {!isCompactGrindersLayout ? (
           <span
@@ -313,6 +299,8 @@ export function GraiGrindersSection() {
             )}
           </span>
         </div>
+        <div className="grai-grinders-summary-table-row">
+          <div className="grai-grinders-grinders-panel-slot">
         <section
           className={`grai-bottom-card grai-bottom-card--table grai-grinders-table-panel${isGrindersTableHidden ? '' : ' is-open'}`}
           aria-hidden={isGrindersTableHidden}
@@ -456,38 +444,58 @@ export function GraiGrindersSection() {
             )}
           </div>
         </section>
-        <div className="grai-grinders-summary-toggle">
-          <button
-            type="button"
-            className={`grai-donut-legend-toggle grai-grinders-show-all-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
-            onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
-            aria-expanded={!isGrindersTableHidden}
-            aria-controls="grai-grinders-table"
-            aria-label={
-              isGrindersTableHidden
-                ? `View grinders (${grinderTotalCount})`
-                : 'Hide grinders table'
-            }
-          >
-            <span className="grai-grinders-section-toggle-inner">
-              <svg
-                className="grai-donut-legend-toggle-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-              <span className="grai-grinders-section-toggle-label" aria-hidden="true">
-                VIEW GRINDERS
-                <span className="grai-grinders-section-toggle-count">{grinderTotalCount}</span>
+          </div>
+        </div>
+        <div className="grai-grinders-summary-toggles-row">
+          <div className="grai-grinders-summary-toggle grai-grinders-show-all-toggle-wrap">
+            <button
+              type="button"
+              className={`grai-donut-legend-toggle grai-grinders-show-all-toggle ${isGrindersTableHidden ? 'is-collapsed' : ''}`}
+              onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
+              aria-expanded={!isGrindersTableHidden}
+              aria-controls="grai-grinders-table"
+              aria-label={
+                isGrindersTableHidden
+                  ? `View grinders (${grinderTotalCount})`
+                  : 'Hide grinders table'
+              }
+            >
+              <span className="grai-grinders-section-toggle-inner">
+                <svg
+                  className="grai-donut-legend-toggle-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+                <span className="grai-grinders-section-toggle-label" aria-hidden="true">
+                  VIEW GRINDERS
+                  <span className="grai-grinders-section-toggle-count">{grinderTotalCount}</span>
+                </span>
               </span>
-            </span>
-          </button>
+            </button>
+          </div>
+          {bossEndpointsToggle}
+        </div>
+        <div className="grai-grinders-summary-endpoints-panel-row">
+          <div
+            id="grai-boss-endpoints-panel"
+            className={`grai-boss-endpoints-panel${isBossEndpointsOpen ? ' is-open' : ''}`}
+            aria-hidden={!isBossEndpointsOpen}
+          >
+            <div className="grai-boss-endpoints-panel-inner">
+              {shouldMountBossEndpoints ? (
+                <Suspense fallback={<span className="grai-boss-endpoints-status">Loading endpoints…</span>}>
+                  <BossEndpointsTable endpoints={bossEndpoints} />
+                </Suspense>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
     </div>
