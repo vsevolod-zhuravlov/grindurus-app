@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, lazy, Suspense, useTransition } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { FloatingTokenBackground, STABLE_FLOATING_TOKENS } from '../components/FloatingTokenBackground'
 import { GraiGrindersSection } from '../components/grai/GraiGrindersSection'
@@ -6,19 +6,6 @@ import { GraiMintBurnPanel } from '../components/grai/GraiMintBurnPanel'
 import { GraiAssetsSection } from '../components/grai/GraiAssetsSection'
 import { type GraiSection, isManageSectionHash } from '../utils/graiNavigation'
 import './GraiPage.css'
-
-const GraiTokenFlowDiagram = lazy(() =>
-  import('../components/GraiTokenFlowDiagram').then((m) => ({ default: m.GraiTokenFlowDiagram })),
-)
-
-function TokenFlowLoading() {
-  return (
-    <div className="grai-token-flow-loading" role="status" aria-live="polite">
-      <span className="grai-token-flow-loading-spinner" aria-hidden="true" />
-      <span>Loading information…</span>
-    </div>
-  )
-}
 
 const GRAI_ACTIONS_SUBTITLES = {
   mint: 'Turn Assets Price Volatility into Yield',
@@ -88,37 +75,11 @@ function GraiActionsSubtitle({ actionView }: { actionView: 'mint' | 'burn' }) {
 function GraiPage() {
   const { clusterMismatch, evmChainMismatch, solanaCluster, chainKind, evm, hasStaticConfig, isConfigured, protocolError } = useGraiDeployment()
   const [actionView, setActionView] = useState<'mint' | 'burn'>('mint')
-  const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
-  const [isTokenFlowMounted, setIsTokenFlowMounted] = useState(false)
-  const [isTokenFlowPending, startTokenFlowTransition] = useTransition()
-  const [isTitleCollapsed, setIsTitleCollapsed] = useState(false)
+
   const [isManageSectionOpen, setIsManageSectionOpen] = useState(() =>
     isManageSectionHash(window.location.hash.slice(1)),
   )
 
-  const toggleTokenFlow = useCallback(() => {
-    startTokenFlowTransition(() => {
-      setIsTokenFlowOpen((open) => {
-        if (!open) setIsTokenFlowMounted(true)
-        return !open
-      })
-    })
-  }, [])
-  const isCompactHeaderInteraction = useCallback(() => {
-    return window.matchMedia('(max-width: 1024px)').matches
-  }, [])
-  const handleTitlePointerEnter = useCallback(() => {
-    if (isCompactHeaderInteraction()) return
-    setIsTitleCollapsed(true)
-  }, [isCompactHeaderInteraction])
-  const handleTitlePointerLeave = useCallback(() => {
-    if (isCompactHeaderInteraction()) return
-    setIsTitleCollapsed(false)
-  }, [isCompactHeaderInteraction])
-  const handleTitleClick = useCallback(() => {
-    if (!isCompactHeaderInteraction()) return
-    setIsTitleCollapsed((collapsed) => !collapsed)
-  }, [isCompactHeaderInteraction])
   useEffect(() => {
     const applySection = (section: GraiSection) => {
       if (section === 'mint') setActionView('mint')
