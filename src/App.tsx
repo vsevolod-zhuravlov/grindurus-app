@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
 import Header from './components/Header'
 import { useWalletContext } from './providers/AppWalletProvider'
 import { navigateToGraiSection } from './utils/graiNavigation'
@@ -76,6 +77,7 @@ function App() {
           <Route path="*" element={<Navigate to="/grai" replace />} />
         </Routes>
       </main>
+      <ToastContainer position="bottom-right" newestOnTop />
     </div>
   )
 }

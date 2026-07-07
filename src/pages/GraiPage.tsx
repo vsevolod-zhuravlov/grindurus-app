@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { FloatingTokenBackground, STABLE_FLOATING_TOKENS } from '../components/FloatingTokenBackground'
 import { GraiGrindersSection } from '../components/grai/GraiGrindersSection'
@@ -6,71 +6,6 @@ import { GraiMintBurnPanel } from '../components/grai/GraiMintBurnPanel'
 import { GraiAssetsSection } from '../components/grai/GraiAssetsSection'
 import { type GraiSection, isManageSectionHash } from '../utils/graiNavigation'
 import './GraiPage.css'
-
-const GRAI_ACTIONS_SUBTITLES = {
-  mint: 'Turn Assets Price Volatility into Yield',
-  burn: 'Exit your GRAI position anytime',
-} as const
-
-const GRAI_ACTIONS_SUBTITLE_FIT_TEXT = Object.values(GRAI_ACTIONS_SUBTITLES).reduce((longest, current) =>
-  current.length > longest.length ? current : longest,
-)
-
-function GraiActionsSubtitle({ actionView }: { actionView: 'mint' | 'burn' }) {
-  const subtitleRef = useRef<HTMLParagraphElement>(null)
-  const text = GRAI_ACTIONS_SUBTITLES[actionView]
-
-  const fitSubtitleWidth = useCallback(() => {
-    const el = subtitleRef.current
-    if (!el) return
-
-    el.style.fontSize = ''
-    el.classList.remove('is-fit-width')
-
-    if (el.clientWidth < 520) return
-
-    const containerWidth = el.clientWidth
-    if (containerWidth <= 0) return
-
-    const visibleText = el.textContent ?? ''
-    el.textContent = GRAI_ACTIONS_SUBTITLE_FIT_TEXT
-
-    let min = 12
-    let max = 72
-    let best = min
-
-    while (min <= max) {
-      const mid = Math.floor((min + max) / 2)
-      el.style.fontSize = `${mid}px`
-      if (el.scrollWidth <= containerWidth) {
-        best = mid
-        min = mid + 1
-      } else {
-        max = mid - 1
-      }
-    }
-
-    el.style.fontSize = `${best}px`
-    el.textContent = visibleText
-    el.classList.add('is-fit-width')
-  }, [])
-
-  useLayoutEffect(() => {
-    fitSubtitleWidth()
-    const el = subtitleRef.current
-    if (!el) return
-
-    const observer = new ResizeObserver(fitSubtitleWidth)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [fitSubtitleWidth, text])
-
-  return (
-    <p ref={subtitleRef} className="grai-page-subtitle">
-      {text}
-    </p>
-  )
-}
 
 function GraiPage() {
   const { clusterMismatch, evmChainMismatch, solanaCluster, chainKind, evm, hasStaticConfig, isConfigured, protocolError } = useGraiDeployment()
@@ -115,12 +50,12 @@ function GraiPage() {
         <div className="grai-page-meta">
           {clusterMismatch && (
             <p className="grai-page-network-warning" role="status">
-              Switch your Solana wallet to {solanaCluster === 'mainnet-beta' ? 'Mainnet' : solanaCluster} to mint or burn GRAI.
+              Switch your Solana wallet to {solanaCluster === 'mainnet-beta' ? 'Mainnet' : solanaCluster} to mint or redeem GRAI.
             </p>
           )}
           {evmChainMismatch && evm && (
             <p className="grai-page-network-warning" role="status">
-              Switch your EVM wallet to {evm.chainName} to mint or burn GRAI.
+              Switch your EVM wallet to {evm.chainName} to mint or redeem GRAI.
             </p>
           )}
           {!isConfigured && chainKind === null && (
@@ -148,7 +83,6 @@ function GraiPage() {
 
       <FloatingTokenBackground tokens={STABLE_FLOATING_TOKENS} className="grai-content-row">
         <div className="grai-actions-block" id="grai-actions-section">
-          <GraiActionsSubtitle actionView={actionView} />
           <GraiMintBurnPanel actionView={actionView} onActionViewChange={setActionView} />
         </div>
       </FloatingTokenBackground>
