@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Info } from 'lucide-react'
 import { ConnectWalletButton } from './ConnectWalletButton'
 import { HeaderSettingsPopover } from './HeaderSettingsPopover'
+import { HowItWorksModal } from './HowItWorksModal'
 import { assetUrl } from '../utils/appPaths'
 import './Header.css'
 
 function Header() {
   const { pathname } = useLocation()
   const isBacktestActive = pathname.startsWith('/backtest')
+  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false)
 
   return (
     <header className="header">
@@ -36,7 +39,12 @@ function Header() {
                 </NavLink>
               </li>
               <li style={{ display: "flex", alignItems: "end" }}>
-                <button type="button" className="header-nav-link header-nav-info">
+                <button
+                  type="button"
+                  className="header-nav-link header-nav-info"
+                  onClick={() => setIsHowItWorksOpen(true)}
+                  aria-haspopup="dialog"
+                >
                   <Info className="header-nav-info-icon" aria-hidden="true" />
                   How it works?
                 </button>
@@ -51,6 +59,7 @@ function Header() {
           </div>
         </div>
       </div>
+      <HowItWorksModal isOpen={isHowItWorksOpen} onClose={() => setIsHowItWorksOpen(false)} />
     </header>
   )
 }

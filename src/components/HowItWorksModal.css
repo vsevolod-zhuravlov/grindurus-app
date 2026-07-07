@@ -1,0 +1,194 @@
+.hiw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 2rem;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: hiw-backdrop-in 0.25s ease;
+}
+
+@keyframes hiw-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.hiw-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1280px;
+  height: 100%;
+  max-height: calc(100dvh - 3rem);
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 105, 180, 0.25);
+  border-radius: 16px;
+  background: var(--bg-primary);
+  box-shadow:
+    0 25px 80px rgba(255, 105, 180, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  animation: hiw-modal-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes hiw-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hiw-modal-backdrop,
+  .hiw-modal {
+    animation: none;
+  }
+}
+
+.hiw-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.hiw-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #ff69b4;
+  text-transform: uppercase;
+}
+
+.hiw-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hiw-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hiw-modal-close:hover {
+  background: rgba(255, 105, 180, 0.15);
+  color: #ff69b4;
+}
+
+[data-theme='light'] .hiw-modal-close {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.hiw-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+/* Replays the token flow step entrance animation inside the modal
+   (originally scoped to .grai-token-flow-panel.is-open on the GRAI page). */
+.hiw-modal-body .grai-token-flow-step {
+  animation: grai-token-flow-step-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(1) {
+  animation-delay: 0.06s;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(3) {
+  animation-delay: 0.18s;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(5) {
+  animation-delay: 0.3s;
+}
+
+.hiw-modal-body .grai-token-flow-step:nth-child(6) {
+  animation-delay: 0.36s;
+}
+
+.hiw-modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 8rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.hiw-modal-loading-spinner {
+  display: inline-block;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 105, 180, 0.25);
+  border-top-color: #ff69b4;
+  border-radius: 50%;
+  animation: hiw-modal-spin 0.8s linear infinite;
+}
+
+@keyframes hiw-modal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .hiw-modal-backdrop {
+    padding: 0.75rem;
+  }
+
+  .hiw-modal {
+    max-height: calc(100dvh - 1.5rem);
+    border-radius: 12px;
+  }
+
+  .hiw-modal-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .hiw-modal-body {
+    padding: 1rem;
+  }
+}
