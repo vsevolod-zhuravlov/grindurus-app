@@ -99,8 +99,8 @@
   color: #7c3aed;
 }
 
-.header-nav-link:hover:not(.is-disabled):not(.header-nav-info) {
-  color: #c4b5fd;
+.header-nav-link:hover:not(.is-disabled) {
+  color: #ff9cac;
 }
 
 [data-theme="light"] .header-nav-link:hover:not(.is-disabled):not(.header-nav-info) {
@@ -108,6 +108,7 @@
 }
 
 .header-nav-link.is-current {
+  color: #ffc0cb;
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 0.2em;
@@ -118,6 +119,7 @@
 }
 
 .header-nav-info {
+  color: #ffc0cb;
   gap: 0.35rem;
   text-decoration: underline;
   text-decoration-style: dashed;
@@ -125,7 +127,6 @@
 }
 
 .header-nav-info:hover {
-  color: #c4b5fd;
   text-decoration-style: solid;
 }
 
