@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { normalizeDecimalInput } from '../../grai/onchain'
+import { formatTokenBalance, normalizeDecimalInput, parseTokenAmount } from '../../grai/onchain'
 import { formatVaultBalanceDisplay } from '../../grai/formatVaultBalance'
 import { useGraiDeployment } from '../../grai/GraiDeploymentProvider'
 import { ACTION_TX_ICON } from '../../grai/graiActionIcons'
@@ -20,16 +20,15 @@ import { WalletIcon } from '../WalletIcon'
 import { assetUrl } from '../../utils/appPaths'
 import { playBullSound, primeBullSound } from '../../utils/playBullSound'
 import { shortenAddress } from '../../utils/shortenAddress'
-import { GraiBalanceFieldLabel, GraiFieldInfoButton } from './GraiFieldInfo'
+import { GraiFieldInfoButton } from './GraiFieldInfo'
 import {
+  GraiActionConnectWalletButton,
   GraiEstimateSuffix,
-  GraiWalletActorRow,
   GraiWalletBalanceSlot,
 } from './GraiWalletAction'
 import {
   ACTION_SWITCH_ICONS,
   AMOUNT_PREFIX_PLUS_ICON,
-  BALANCE_COLUMN_ICONS,
   JUNIOR_VAULT_FIELD_ICON,
   MINT_ASSET_SOLSCAN_ICON,
   SENIOR_VAULT_FIELD_ICON,
@@ -50,12 +49,9 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     evm,
     explorerTokenUrl,
     explorerTxUrl,
-    explorerAccountUrl,
   } = useGraiDeployment()
   const activeWallet = useActiveWallet()
   const isWalletConnected = activeWallet.isConnected
-  const connectedWalletAddress = activeWallet.address || null
-  const shortAddress = activeWallet.shortAddress || null
   const {
     assets: mintAssets,
     isLoading: mintAssetsLoading,
@@ -72,9 +68,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   const [mintAmount, setMintAmount] = useState('')
   const [selectedMint, setSelectedMint] = useState('')
   const [mintAssetMenuOpen, setMintAssetMenuOpen] = useState(false)
-  const [minterWalletCopied, setMinterWalletCopied] = useState(false)
   const [burnAmount, setBurnAmount] = useState('')
-  const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(true)
+  const [isBurnAssetsRowsHidden, setIsBurnAssetsRowsHidden] = useState(false)
   const [isMintSplitSharesHidden, setIsMintSplitSharesHidden] = useState(false)
   const [isBurnTxResultHidden, setIsBurnTxResultHidden] = useState(false)
   const mintAssetMenuRef = useRef<HTMLDivElement>(null)
@@ -109,6 +104,13 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     if (totalUsd <= 0n) return '$0'
     return `$${formatVaultBalanceDisplay(totalUsd, usdScale)}`
   }, [burnAmount, burnOutputs, isBurnEstimateLoading, usdScale])
+  const mintDepositUsdLabel = useMemo(() => {
+    if (!mintAmount.trim()) return '$0.00'
+    if (isEstimateLoading) return '…'
+    const totalUsd = seniorShareUsdRaw + juniorShareUsdRaw
+    if (totalUsd <= 0n) return '$0.00'
+    return `$${formatVaultBalanceDisplay(totalUsd, usdScale, 2)}`
+  }, [isEstimateLoading, juniorShareUsdRaw, mintAmount, seniorShareUsdRaw, usdScale])
   const isBurnConfirmed = burnStatus === 'success' && Boolean(burnSignature)
   const confirmedBurnGraiLabel = useMemo(() => {
     if (burnAmountLabel?.trim()) return burnAmountLabel
@@ -131,29 +133,12 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
 
   const graiDecimals = graiBalanceDecimals ?? defaultGraiDecimals
 
-  const copyMinterWalletAddress = useCallback(() => {
-    if (!connectedWalletAddress) return
-    void navigator.clipboard.writeText(connectedWalletAddress).then(() => {
-      setMinterWalletCopied(true)
-    })
-  }, [connectedWalletAddress])
-
   useEffect(() => {
     if (mintAssets.length === 0) return
     if (!mintAssets.some((asset) => asset.mint === selectedMint)) {
       setSelectedMint(mintAssets[0].mint)
     }
   }, [mintAssets, selectedMint])
-
-  useEffect(() => {
-    if (!minterWalletCopied) return
-    const timer = window.setTimeout(() => setMinterWalletCopied(false), 1500)
-    return () => window.clearTimeout(timer)
-  }, [minterWalletCopied])
-
-  useEffect(() => {
-    setMinterWalletCopied(false)
-  }, [connectedWalletAddress])
 
   useEffect(() => {
     resetMint()
@@ -209,6 +194,24 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     }
   }, [burnAmount, burnGrai])
 
+  const applyBurnAmountFraction = useCallback(
+    (fraction: number) => {
+      if (!maxBurnAmount || graiDecimals === null) return
+      if (fraction >= 1) {
+        setBurnAmount(maxBurnAmount)
+        return
+      }
+      try {
+        const maxRaw = parseTokenAmount(maxBurnAmount, graiDecimals)
+        const amountRaw = (maxRaw * BigInt(Math.round(fraction * 100))) / 100n
+        setBurnAmount(formatTokenBalance(amountRaw, graiDecimals))
+      } catch {
+        // ignore invalid balance parse
+      }
+    },
+    [graiDecimals, maxBurnAmount],
+  )
+
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
       if (!mintAssetMenuRef.current) return
@@ -254,31 +257,14 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
           <div className="grai-action-content">
             {actionView === 'mint' ? (
               <>
-                <GraiWalletActorRow
-                  label="Minter"
-                  hint="Minter wallet for signing mint transactions"
-                  isConnected={isWalletConnected}
-                  shortAddress={shortAddress}
-                  connectedWalletAddress={connectedWalletAddress}
-                  walletCopied={minterWalletCopied}
-                  onCopyWallet={copyMinterWalletAddress}
-                  onConnect={openChainSelector}
-                  explorerAccountUrl={explorerAccountUrl}
-                />
                 <div className="grai-mint-amount-block">
-                <div className="grai-mint-amount-header">
-                  <GraiBalanceFieldLabel hint="Minter's wallet balance of selected asset" />
-                  <GraiWalletBalanceSlot
-                    label={balanceLabel}
-                    symbol={selectedAsset?.symbol}
-                    isConnected={isWalletConnected}
-                    explorerHref={selectedAsset?.mint ? explorerTokenUrl(selectedAsset.mint) : null}
-                  />
-                </div>
                 <div className="grai-mint-amount-field">
                   <div className="grai-mint-amount-row grai-mint-amount-row--with-asset-label">
                     <div className="grai-mint-amount-input-col">
-                      <span className="grai-field-label grai-mint-amount-input-label">
+                      <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
+                        <span className="grai-estimated-amount-prefix-plus" aria-hidden="true">
+                          {AMOUNT_PREFIX_PLUS_ICON}
+                        </span>
                         Deposit Amount
                       </span>
                       <div className="grai-input-with-suffix has-max">
@@ -303,14 +289,15 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                           MAX
                         </button>
                       </div>
+                      <div className="grai-mint-amount-usd-hint" aria-live="polite">
+                        <span
+                          className={`grai-mint-amount-usd-value${mintAmount.trim() ? '' : ' is-placeholder'}`}
+                        >
+                          {mintDepositUsdLabel}
+                        </span>
+                      </div>
                     </div>
                     <div className="grai-mint-amount-asset-col">
-                      <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-asset-label">
-                        <span className="grai-field-label-icon" aria-hidden="true">
-                          {BALANCE_COLUMN_ICONS.assets}
-                        </span>
-                        Asset
-                      </span>
                       <div className="grai-mint-asset-dropdown" ref={mintAssetMenuRef}>
                       <div className="grai-mint-asset-value">
                         <button
@@ -347,6 +334,17 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                             ▾
                           </span>
                         </button>
+                      </div>
+                      <div
+                        className="grai-mint-asset-balance"
+                        aria-label="Minter's wallet balance of selected asset"
+                      >
+                        <GraiWalletBalanceSlot
+                          label={balanceLabel}
+                          symbol={selectedAsset?.symbol}
+                          isConnected={isWalletConnected}
+                          explorerHref={selectedAsset?.mint ? explorerTokenUrl(selectedAsset.mint) : null}
+                        />
                       </div>
                       {mintAssetMenuOpen && mintAssets.length > 0 && (
                         <div className="grai-mint-asset-list" role="listbox" aria-label="Mint asset list">
@@ -407,8 +405,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     aria-controls="grai-mint-split-shares"
                     aria-label={
                       isMintSplitSharesHidden
-                        ? 'Show mint result breakdown'
-                        : 'Hide mint result breakdown'
+                        ? 'Show mint transaction preview'
+                        : 'Hide mint transaction preview'
                     }
                   >
                     <span className="grai-mint-amount-flow-arrow-inner">
@@ -424,7 +422,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                       <span className="grai-mint-amount-flow-arrow-label" aria-hidden="true">
-                        TX RESULT
+                        TX PREVIEW
                       </span>
                     </span>
                   </button>
@@ -558,52 +556,59 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                   )}
                 </div>
                 )}
-                <button
-                  type="button"
-                  className="grai-mint-btn"
-                  disabled={isMinting || !selectedAsset?.mint || !mintAmount.trim()}
-                  onClick={() => {
-                    void handleMint()
-                  }}
-                >
-                  <span className="grai-action-tx-btn-icon" aria-hidden="true">
-                    {ACTION_TX_ICON}
-                  </span>
-                  {isMinting ? 'MINTING…' : 'MINT'}
-                </button>
+                {isWalletConnected ? (
+                  <button
+                    type="button"
+                    className="grai-mint-btn"
+                    disabled={isMinting || !selectedAsset?.mint || !mintAmount.trim()}
+                    onClick={() => {
+                      void handleMint()
+                    }}
+                  >
+                    <span className="grai-action-tx-btn-icon" aria-hidden="true">
+                      {ACTION_TX_ICON}
+                    </span>
+                    {isMinting ? 'MINTING…' : 'MINT'}
+                  </button>
+                ) : (
+                  <GraiActionConnectWalletButton onConnect={openChainSelector} />
+                )}
               </>
             ) : (
               <>
-                <GraiWalletActorRow
-                  label="Burner"
-                  hint="Burner wallet for signing burn transactions"
-                  isConnected={isWalletConnected}
-                  shortAddress={shortAddress}
-                  connectedWalletAddress={connectedWalletAddress}
-                  walletCopied={minterWalletCopied}
-                  onCopyWallet={copyMinterWalletAddress}
-                  onConnect={openChainSelector}
-                  explorerAccountUrl={explorerAccountUrl}
-                />
                 <div className="grai-mint-amount-block">
-                <div className="grai-mint-amount-header">
-                    <GraiBalanceFieldLabel hint="Burner's wallet balance of GRAI" />
-                    <GraiWalletBalanceSlot
-                      label={graiBalanceLabel}
-                      symbol="GRAI"
-                      isConnected={isWalletConnected}
-                      explorerHref={graiExplorerHref}
-                    />
-                  </div>
                 <div className="grai-mint-amount-field">
-                  <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
-                    <span className="grai-field-label-icon" aria-hidden="true">
-                      {ACTION_SWITCH_ICONS.burn}
+                  <div className="grai-mint-amount-label-row">
+                    <span className="grai-field-label grai-field-label--with-icon grai-mint-amount-input-label">
+                      <span className="grai-field-label-icon" aria-hidden="true">
+                        {ACTION_SWITCH_ICONS.burn}
+                      </span>
+                      Burn Amount
                     </span>
-                    Burn Amount
-                  </span>
-                  <div className="grai-mint-amount-row">
-                    <div className="grai-input-with-suffix has-max">
+                    <div className="grai-amount-preset-btns" aria-label="Burn amount presets">
+                      {[25, 50, 75].map((percent) => (
+                        <button
+                          key={percent}
+                          type="button"
+                          className="grai-amount-preset-btn"
+                          onClick={() => applyBurnAmountFraction(percent / 100)}
+                          disabled={!maxBurnAmount}
+                        >
+                          {percent}%
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="grai-amount-preset-btn"
+                        onClick={() => applyBurnAmountFraction(1)}
+                        disabled={!maxBurnAmount}
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grai-mint-amount-row grai-mint-amount-row--with-burn-suffix">
+                    <div className="grai-input-with-suffix has-max is-without-max-btn">
                       <input
                         type="text"
                         inputMode="decimal"
@@ -614,42 +619,45 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                           setBurnAmount(normalizeDecimalInput(e.target.value, graiDecimals ?? 9))
                         }}
                       />
-                      <button
-                        type="button"
-                        className="grai-input-max-btn"
-                        onClick={() => {
-                          if (maxBurnAmount) setBurnAmount(maxBurnAmount)
-                        }}
-                        disabled={!maxBurnAmount}
-                      >
-                        MAX
-                      </button>
                     </div>
-                    <span className="grai-burn-amount-suffix">
-                      <span className="grai-mint-asset-item-icon" aria-hidden="true">
-                        <img
-                          src={assetUrl('logo.png')}
-                          alt=""
-                          width={16}
-                          height={16}
-                          loading="lazy"
-                          decoding="async"
-                        />
+                    <div className="grai-burn-amount-trailing-col">
+                      <span className="grai-burn-amount-suffix">
+                        <span className="grai-mint-asset-item-icon" aria-hidden="true">
+                          <img
+                            src={assetUrl('logo.png')}
+                            alt=""
+                            width={16}
+                            height={16}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </span>
+                        <span className="grai-mint-asset-symbol">GRAI</span>
+                        {graiMintAddress !== '—' && (
+                          <a
+                            href={explorerTokenUrl(graiMintAddress) ?? '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="grai-mint-asset-value-solscan"
+                            aria-label="View GRAI contract on block explorer"
+                            title="View GRAI contract on block explorer"
+                          >
+                            {MINT_ASSET_SOLSCAN_ICON}
+                          </a>
+                        )}
                       </span>
-                      <span className="grai-mint-asset-symbol">GRAI</span>
-                      {graiMintAddress !== '—' && (
-                        <a
-                          href={explorerTokenUrl(graiMintAddress) ?? '#'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="grai-mint-asset-value-solscan"
-                          aria-label="View GRAI contract on block explorer"
-                          title="View GRAI contract on block explorer"
-                        >
-                          {MINT_ASSET_SOLSCAN_ICON}
-                        </a>
-                      )}
-                    </span>
+                      <div
+                        className="grai-mint-asset-balance"
+                        aria-label="Burner's wallet balance of GRAI"
+                      >
+                        <GraiWalletBalanceSlot
+                          label={graiBalanceLabel}
+                          symbol="GRAI"
+                          isConnected={isWalletConnected}
+                          explorerHref={graiExplorerHref}
+                        />
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -659,8 +667,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                     aria-controls="grai-burn-tx-result"
                     aria-label={
                       isBurnTxResultHidden
-                        ? 'Show burn transaction result'
-                        : 'Hide burn transaction result'
+                        ? 'Show burn transaction preview'
+                        : 'Hide burn transaction preview'
                     }
                   >
                     <span className="grai-mint-amount-flow-arrow-inner">
@@ -676,7 +684,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                       <span className="grai-mint-amount-flow-arrow-label" aria-hidden="true">
-                        TX RESULT
+                        TX PREVIEW
                       </span>
                     </span>
                   </button>
@@ -825,19 +833,23 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
                   )}
                 </div>
                 )}
-                <button
-                  type="button"
-                  className="grai-burn-btn"
-                  disabled={isBurning || !burnAmount.trim()}
-                  onClick={() => {
-                    void handleBurn()
-                  }}
-                >
-                  <span className="grai-action-tx-btn-icon" aria-hidden="true">
-                    {ACTION_TX_ICON}
-                  </span>
-                  {isBurning ? 'BURNING…' : 'BURN'}
-                </button>
+                {isWalletConnected ? (
+                  <button
+                    type="button"
+                    className="grai-burn-btn"
+                    disabled={isBurning || !burnAmount.trim()}
+                    onClick={() => {
+                      void handleBurn()
+                    }}
+                  >
+                    <span className="grai-action-tx-btn-icon" aria-hidden="true">
+                      {ACTION_TX_ICON}
+                    </span>
+                    {isBurning ? 'BURNING…' : 'BURN'}
+                  </button>
+                ) : (
+                  <GraiActionConnectWalletButton onConnect={openChainSelector} />
+                )}
               </>
             )}
           </div>

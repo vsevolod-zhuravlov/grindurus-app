@@ -154,7 +154,7 @@ const FLOW_DIAGRAMS: FlowDiagramConfig[] = [
     id: 'decision',
     title: 'Strategy',
     description:
-      'Each grinder independently decides whether to buy, sell or hold assets.',
+      'Each grinder independently decides whether to buy, sell or hold assets with aim to make yield on market price volatility.',
     height: 190,
     fitPadding: 0.28,
     centerInPane: true,

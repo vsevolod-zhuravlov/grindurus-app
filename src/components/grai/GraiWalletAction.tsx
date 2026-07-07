@@ -67,7 +67,6 @@ export function GraiWalletActorRow({
   connectedWalletAddress,
   walletCopied,
   onCopyWallet,
-  onConnect,
   explorerAccountUrl,
 }: {
   label: string
@@ -77,7 +76,6 @@ export function GraiWalletActorRow({
   connectedWalletAddress?: string | null
   walletCopied: boolean
   onCopyWallet: () => void
-  onConnect: () => void
   explorerAccountUrl?: ((address: string) => string | null) | null
 }) {
   return (
@@ -120,18 +118,22 @@ export function GraiWalletActorRow({
           </span>
         ) : (
           <span className="grai-mint-asset-address-actions">
-            <button
-              type="button"
-              className="connect-wallet-btn grai-mint-feedback-wallet-connect"
-              onClick={onConnect}
-            >
-              <WalletIcon />
-              Connect Wallet
-            </button>
+            <span className="grai-wallet-action-slot">
+              <span className="grai-wallet-balance">—</span>
+            </span>
           </span>
         )}
       </span>
     </p>
+  )
+}
+
+export function GraiActionConnectWalletButton({ onConnect }: { onConnect: () => void }) {
+  return (
+    <button type="button" className="connect-wallet-btn grai-action-connect-wallet-btn" onClick={onConnect}>
+      <WalletIcon />
+      Connect Wallet
+    </button>
   )
 }
 

@@ -1849,6 +1849,26 @@ html:has(body[data-scroll-locked]) body {
     display: none;
   }
 
+  .header-wallet-slot--connected .header-wallet-address-btn {
+    width: var(--header-control-size, 40px);
+    min-width: var(--header-control-size, 40px);
+    max-width: var(--header-control-size, 40px);
+    height: var(--header-control-size, 40px);
+    min-height: var(--header-control-size, 40px);
+    max-height: var(--header-control-size, 40px);
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    overflow: hidden;
+    border-width: 2px;
+    border-color: #ff69b4;
+    border-radius: 10px;
+  }
+
+  .header-wallet-slot--connected .header-wallet-address-text {
+    display: none;
+  }
+
   .header-wallet-slot--connected .wallet-current-network-icon,
   .header-wallet-slot--connected .wallet-current-network-icon--ethereum {
     width: 22px;

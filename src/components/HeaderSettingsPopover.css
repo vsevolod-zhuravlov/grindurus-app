@@ -314,6 +314,10 @@
 }
 
 @media (max-width: 768px) {
+  .header-settings {
+    position: relative;
+  }
+
   .header-settings-trigger {
     width: var(--header-control-size, 40px);
     height: var(--header-control-size, 40px);
@@ -321,7 +325,36 @@
   }
 
   .header-settings-popover {
-    left: 0;
+    left: auto;
+    right: 0;
+    width: min(17.5rem, calc(100vw - 1.25rem));
+    min-width: min(17.5rem, calc(100vw - 1.25rem));
+    padding: 12px;
+    border-radius: 12px;
+    border-top-right-radius: 0;
+  }
+
+  .header-settings-row {
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
+    gap: 0.65rem;
+  }
+
+  .header-settings-segmented {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .header-settings-action {
+    padding: 11px 12px;
+    font-size: 0.9rem;
+  }
+
+  .header-settings-action-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

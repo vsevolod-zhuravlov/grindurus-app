@@ -179,7 +179,7 @@ export function GraiGrindersSection() {
         }}
         aria-expanded={isBossEndpointsOpen}
         aria-controls="grai-boss-endpoints-panel"
-        aria-label={isBossEndpointsOpen ? 'Hide Boss API endpoints' : 'Show Boss API endpoints'}
+        aria-label={isBossEndpointsOpen ? 'Hide endpoints' : 'View endpoints'}
       >
         <span className="grai-grinders-section-toggle-inner">
           <svg
@@ -195,7 +195,7 @@ export function GraiGrindersSection() {
             <path d="M6 9l6 6 6-6" />
           </svg>
           <span className="grai-grinders-section-toggle-label" aria-hidden="true">
-            ENDPOINTS
+            VIEW ENDPOINTS
           </span>
         </span>
       </button>
@@ -463,7 +463,11 @@ export function GraiGrindersSection() {
             onClick={() => setIsGrindersTableHidden((hidden) => !hidden)}
             aria-expanded={!isGrindersTableHidden}
             aria-controls="grai-grinders-table"
-            aria-label={isGrindersTableHidden ? 'Show all grinders' : 'Hide grinders table'}
+            aria-label={
+              isGrindersTableHidden
+                ? `View grinders (${grinderTotalCount})`
+                : 'Hide grinders table'
+            }
           >
             <span className="grai-grinders-section-toggle-inner">
               <svg
@@ -479,7 +483,8 @@ export function GraiGrindersSection() {
                 <path d="M6 9l6 6 6-6" />
               </svg>
               <span className="grai-grinders-section-toggle-label" aria-hidden="true">
-                ALL GRINDERS
+                VIEW GRINDERS
+                <span className="grai-grinders-section-toggle-count">{grinderTotalCount}</span>
               </span>
             </span>
           </button>

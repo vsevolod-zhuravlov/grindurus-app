@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, lazy, Suspense, useTransition } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, lazy, Suspense, useTransition } from 'react'
 import { useGraiDeployment } from '../grai/GraiDeploymentProvider'
 import { FloatingTokenBackground, STABLE_FLOATING_TOKENS } from '../components/FloatingTokenBackground'
 import { GraiGrindersSection } from '../components/grai/GraiGrindersSection'
@@ -20,13 +20,78 @@ function TokenFlowLoading() {
   )
 }
 
+const GRAI_ACTIONS_SUBTITLES = {
+  mint: 'Turn Assets Price Volatility into Yield',
+  burn: 'Exit your GRAI position anytime',
+} as const
+
+const GRAI_ACTIONS_SUBTITLE_FIT_TEXT = Object.values(GRAI_ACTIONS_SUBTITLES).reduce((longest, current) =>
+  current.length > longest.length ? current : longest,
+)
+
+function GraiActionsSubtitle({ actionView }: { actionView: 'mint' | 'burn' }) {
+  const subtitleRef = useRef<HTMLParagraphElement>(null)
+  const text = GRAI_ACTIONS_SUBTITLES[actionView]
+
+  const fitSubtitleWidth = useCallback(() => {
+    const el = subtitleRef.current
+    if (!el) return
+
+    el.style.fontSize = ''
+    el.classList.remove('is-fit-width')
+
+    if (el.clientWidth < 520) return
+
+    const containerWidth = el.clientWidth
+    if (containerWidth <= 0) return
+
+    const visibleText = el.textContent ?? ''
+    el.textContent = GRAI_ACTIONS_SUBTITLE_FIT_TEXT
+
+    let min = 12
+    let max = 72
+    let best = min
+
+    while (min <= max) {
+      const mid = Math.floor((min + max) / 2)
+      el.style.fontSize = `${mid}px`
+      if (el.scrollWidth <= containerWidth) {
+        best = mid
+        min = mid + 1
+      } else {
+        max = mid - 1
+      }
+    }
+
+    el.style.fontSize = `${best}px`
+    el.textContent = visibleText
+    el.classList.add('is-fit-width')
+  }, [])
+
+  useLayoutEffect(() => {
+    fitSubtitleWidth()
+    const el = subtitleRef.current
+    if (!el) return
+
+    const observer = new ResizeObserver(fitSubtitleWidth)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [fitSubtitleWidth, text])
+
+  return (
+    <p ref={subtitleRef} className="grai-page-subtitle">
+      {text}
+    </p>
+  )
+}
+
 function GraiPage() {
   const { clusterMismatch, evmChainMismatch, solanaCluster, chainKind, evm, hasStaticConfig, isConfigured, protocolError } = useGraiDeployment()
   const [actionView, setActionView] = useState<'mint' | 'burn'>('mint')
   const [isTokenFlowOpen, setIsTokenFlowOpen] = useState(false)
   const [isTokenFlowMounted, setIsTokenFlowMounted] = useState(false)
   const [isTokenFlowPending, startTokenFlowTransition] = useTransition()
-  const [isTitleExpanded, setIsTitleExpanded] = useState(false)
+  const [isTitleCollapsed, setIsTitleCollapsed] = useState(false)
   const [isManageSectionOpen, setIsManageSectionOpen] = useState(() =>
     isManageSectionHash(window.location.hash.slice(1)),
   )
@@ -39,24 +104,21 @@ function GraiPage() {
       })
     })
   }, [])
-  const expandTitle = useCallback(() => {
-    setIsTitleExpanded(true)
-  }, [])
-  const collapseTitle = useCallback(() => {
-    setIsTitleExpanded(false)
-  }, [])
   const isCompactHeaderInteraction = useCallback(() => {
     return window.matchMedia('(max-width: 1024px)').matches
   }, [])
+  const handleTitlePointerEnter = useCallback(() => {
+    if (isCompactHeaderInteraction()) return
+    setIsTitleCollapsed(true)
+  }, [isCompactHeaderInteraction])
   const handleTitlePointerLeave = useCallback(() => {
     if (isCompactHeaderInteraction()) return
-    collapseTitle()
-  }, [collapseTitle, isCompactHeaderInteraction])
+    setIsTitleCollapsed(false)
+  }, [isCompactHeaderInteraction])
   const handleTitleClick = useCallback(() => {
     if (!isCompactHeaderInteraction()) return
-    setIsTitleExpanded((expanded) => !expanded)
+    setIsTitleCollapsed((collapsed) => !collapsed)
   }, [isCompactHeaderInteraction])
-
   useEffect(() => {
     const applySection = (section: GraiSection) => {
       if (section === 'mint') setActionView('mint')
@@ -88,34 +150,38 @@ function GraiPage() {
 
   return (
     <div className="grai-page">
-      <div className={`grai-page-header${isTitleExpanded ? ' is-title-expanded' : ''}`}>
-        <h1
-          className={`grai-page-title${isTitleExpanded ? ' is-expanded' : ''}`}
-          aria-label="GRAI — GRinders Artificial Index"
-          tabIndex={0}
-          onPointerEnter={expandTitle}
-          onPointerLeave={handleTitlePointerLeave}
-          onClick={handleTitleClick}
-          onFocus={expandTitle}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-              collapseTitle()
-            }
-          }}
-        >
-          <span className="grai-page-title-accent">GR</span>
-          <span className="grai-page-title-expand">
-            <span className="grai-page-title-expand-inner">inders</span>
-          </span>
-          <span className="grai-page-title-accent">A</span>
-          <span className="grai-page-title-expand">
-            <span className="grai-page-title-expand-inner">rtificial</span>
-          </span>
-          <span className="grai-page-title-accent">I</span>
-          <span className="grai-page-title-expand">
-            <span className="grai-page-title-expand-inner">ndex</span>
-          </span>
-        </h1>
+      <div className={`grai-page-header${isTitleCollapsed ? ' is-title-collapsed' : ''}`}>
+        <div className="grai-page-header-heading">
+          <h1
+            className={`grai-page-title${isTitleCollapsed ? ' is-collapsed' : ''}`}
+            aria-label="GRAI — GRinders Artificial Index"
+            tabIndex={0}
+            onPointerEnter={handleTitlePointerEnter}
+            onPointerLeave={handleTitlePointerLeave}
+            onClick={handleTitleClick}
+            onFocus={() => {
+              if (!isCompactHeaderInteraction()) setIsTitleCollapsed(true)
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setIsTitleCollapsed(false)
+              }
+            }}
+          >
+            <span className="grai-page-title-accent">GR</span>
+            <span className="grai-page-title-expand">
+              <span className="grai-page-title-expand-inner">inders</span>
+            </span>
+            <span className="grai-page-title-accent">A</span>
+            <span className="grai-page-title-expand">
+              <span className="grai-page-title-expand-inner">rtificial</span>
+            </span>
+            <span className="grai-page-title-accent">I</span>
+            <span className="grai-page-title-expand">
+              <span className="grai-page-title-expand-inner">ndex</span>
+            </span>
+          </h1>
+        </div>
         <div className="grai-page-header-actions">
           <div className="grai-page-info-group">
             <button
@@ -206,15 +272,16 @@ function GraiPage() {
         </div>
       )}
 
-      <div className="grai-bottom-row">
-        <GraiGrindersSection />
-      </div>
-
       <FloatingTokenBackground tokens={STABLE_FLOATING_TOKENS} className="grai-content-row">
         <div className="grai-actions-block" id="grai-actions-section">
+          <GraiActionsSubtitle actionView={actionView} />
           <GraiMintBurnPanel actionView={actionView} onActionViewChange={setActionView} />
         </div>
       </FloatingTokenBackground>
+
+      <div className="grai-bottom-row">
+        <GraiGrindersSection />
+      </div>
 
       <GraiAssetsSection isManageSectionOpen={isManageSectionOpen} />
     </div>

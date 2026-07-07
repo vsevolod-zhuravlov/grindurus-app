@@ -444,6 +444,10 @@
     flex-shrink: 0;
   }
 
+  .header-wallet-cluster {
+    --header-wallet-cluster-gap: 0.5rem;
+  }
+
   .my-grinders-btn {
     padding: 0.45rem 0.75rem;
     font-size: 0.78rem;
