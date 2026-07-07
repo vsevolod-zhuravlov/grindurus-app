@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AppWalletProvider } from './providers/AppWalletProvider'
 import { GraiDeploymentProvider } from './grai/GraiDeploymentProvider'
@@ -12,11 +13,13 @@ if (stripBasePath(window.location.pathname) !== '/backtest') {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <AppWalletProvider>
-    <GraiDeploymentProvider>
-      <GraiDataProvider>
-        <App />
-      </GraiDataProvider>
-    </GraiDeploymentProvider>
-  </AppWalletProvider>,
+  <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <AppWalletProvider>
+      <GraiDeploymentProvider>
+        <GraiDataProvider>
+          <App />
+        </GraiDataProvider>
+      </GraiDeploymentProvider>
+    </AppWalletProvider>
+  </BrowserRouter>,
 )

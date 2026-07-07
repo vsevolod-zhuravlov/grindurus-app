@@ -1,93 +1,80 @@
-import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
-import Header, { type HeaderMainView } from './components/Header'
+import { useEffect, lazy, Suspense } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import Header from './components/Header'
 import { useWalletContext } from './providers/AppWalletProvider'
-import { isAtAppPath, stripBasePath, toAppPath } from './utils/appPaths'
 import { navigateToGraiSection } from './utils/graiNavigation'
 import './App.css'
 
 const GraiPage = lazy(() => import('./pages/GraiPage'))
 const BacktestPage = lazy(() => import('./pages/BacktestPage'))
 
-type AppRoute = 'grai' | 'grai-manage' | 'backtest'
-
-function routeFromPath(pathname: string): AppRoute {
-  const logical = stripBasePath(pathname)
-  if (logical === '/backtest') return 'backtest'
-  if (logical === '/grai/manage') return 'grai-manage'
-  return 'grai'
-}
-
-function pathFromView(view: HeaderMainView): string {
-  return view === 'backtest' ? '/backtest' : '/grai'
-}
-
-function titleFromRoute(route: AppRoute): string {
-  if (route === 'backtest') return 'Backtest Simulator'
-  if (route === 'grai-manage') return 'GRAI — Grinder management'
+function titleFromPath(pathname: string): string {
+  if (pathname.startsWith('/backtest')) return 'Backtest Simulator'
+  if (pathname === '/grai/manage') return 'GRAI — Grinder management'
   return 'GRAI'
 }
 
-function App() {
+function GraiManageRedirect() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    navigate('/grai#allocate', { replace: true })
+    navigateToGraiSection('allocate')
+  }, [navigate])
+
+  return null
+}
+
+function GraiRoute() {
+  return (
+    <Suspense
+      fallback={
+        <div className="App-main-loading" role="status">
+          Loading GRAI…
+        </div>
+      }
+    >
+      <GraiPage />
+    </Suspense>
+  )
+}
+
+function BacktestRoute() {
   const { isEvmStackReady } = useWalletContext()
-  const [route, setRoute] = useState<AppRoute>(() => routeFromPath(window.location.pathname))
-  const mainView: HeaderMainView = route === 'backtest' ? 'backtest' : 'grai'
+
+  if (!isEvmStackReady) {
+    return (
+      <div className="App-main-loading" role="status">
+        Loading backtest runtime...
+      </div>
+    )
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <BacktestPage />
+    </Suspense>
+  )
+}
+
+function App() {
+  const { pathname } = useLocation()
 
   useEffect(() => {
-    if (isAtAppPath('/')) {
-      window.history.replaceState({}, '', toAppPath('/grai'))
-      setRoute('grai')
-    }
-    const onPopState = () => {
-      setRoute(routeFromPath(window.location.pathname))
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
-  const handleViewChange = useCallback((view: HeaderMainView) => {
-    const targetPath = pathFromView(view)
-    if (!isAtAppPath(targetPath)) {
-      window.history.pushState({}, '', toAppPath(targetPath))
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    }
-    setRoute(routeFromPath(targetPath))
-  }, [])
-
-  useEffect(() => {
-    if (route === 'grai-manage') {
-      window.history.replaceState({}, '', `${toAppPath('/grai')}#allocate`)
-      setRoute('grai')
-      navigateToGraiSection('allocate')
-    }
-  }, [route])
-
-  useEffect(() => {
-    document.title = titleFromRoute(route)
-  }, [route])
+    document.title = titleFromPath(pathname)
+  }, [pathname])
 
   return (
     <div className="App">
-      <Header activeView={mainView} onViewChange={handleViewChange} />
-      <main className={`App-main ${route === 'backtest' ? 'App-main--backtest' : ''}`}>
-        {route === 'grai' || route === 'grai-manage' ? (
-          <Suspense
-            fallback={
-              <div className="App-main-loading" role="status">
-                Loading GRAI…
-              </div>
-            }
-          >
-            <GraiPage />
-          </Suspense>
-        ) : isEvmStackReady ? (
-          <Suspense fallback={null}>
-            <BacktestPage />
-          </Suspense>
-        ) : (
-          <div className="App-main-loading" role="status">
-            Loading backtest runtime...
-          </div>
-        )}
+      <Header />
+      <main className={`App-main ${pathname.startsWith('/backtest') ? 'App-main--backtest' : ''}`}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/grai" replace />} />
+          <Route path="/grai" element={<GraiRoute />} />
+          <Route path="/grai/manage" element={<GraiManageRedirect />} />
+          <Route path="/backtest" element={<BacktestRoute />} />
+          <Route path="*" element={<Navigate to="/grai" replace />} />
+        </Routes>
       </main>
     </div>
   )
