@@ -38,3 +38,25 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+/* Match toasts to the app theme */
+.Toastify__toast {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.grai-tx-toast {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.grai-tx-toast a {
+  color: #ff69b4;
+  font-weight: 600;
+}
+
+[data-theme='light'] .grai-tx-toast a {
+  color: #e91e8c;
+}

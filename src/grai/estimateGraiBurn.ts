@@ -37,8 +37,9 @@ const BURN_AMOUNT_MAX_FRACTION_DIGITS = 4
 const BURN_USD_MAX_FRACTION_DIGITS = 2
 
 function formatBurnAmountLabel(redeemRaw: bigint, decimals: number): string {
-  if (redeemRaw <= 0n) return '0'
-  return formatTokenBalance(redeemRaw, decimals, BURN_AMOUNT_MAX_FRACTION_DIGITS)
+  if (redeemRaw <= 0n) return '0.0'
+  const label = formatTokenBalance(redeemRaw, decimals, BURN_AMOUNT_MAX_FRACTION_DIGITS)
+  return label.includes('.') ? label : `${label}.0`
 }
 
 function formatBurnUsdLabel(usdRaw: bigint): string | null {
