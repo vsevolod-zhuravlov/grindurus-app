@@ -7,6 +7,7 @@ import { USD_SCALE } from '../../grai/tokenomics'
 import { useGraiAssets } from '../../hooks/useGraiAssets'
 import { useGraiBurn } from '../../hooks/useGraiBurn'
 import { useGraiMint } from '../../hooks/useGraiMint'
+import { useGraiBurnEstimate } from '../../hooks/useGraiBurnEstimate'
 import { useGraiMintEstimate } from '../../hooks/useGraiMintEstimate'
 import { useWalletAssetBalance } from '../../hooks/useWalletAssetBalance'
 import { useActiveWallet } from '../../hooks/useActiveWallet'
@@ -24,15 +25,6 @@ type Props = {
   onActionViewChange: (view: ActionView) => void
 }
 
-// MOCK: redeem value estimate assumes 1 GRAI = 1 USD.
-// Replace with a real on-chain redeem estimate once redeem pricing is final.
-const MOCK_GRAI_PRICE_USD = 1
-function mockEstimateRedeemUsd(amountInput: string): string {
-  const amount = Number.parseFloat(amountInput)
-  if (!Number.isFinite(amount) || amount <= 0) return '0.00'
-  return (amount * MOCK_GRAI_PRICE_USD).toFixed(2)
-}
-
 export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
   const { openChainSelector } = useWalletContext()
   const { chainKind, solana, staticSolana, evm, explorerTxUrl } = useGraiDeployment()
@@ -44,6 +36,7 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
 
   const [amount, setAmount] = useState('')
   const [selectedAsset, setSelectedAsset] = useState<GraiAmountAsset | null>(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const graiMintAddress =
     chainKind === 'evm' && evm
@@ -73,6 +66,8 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
 
   const {
     estimatedGrai,
+    seniorShareLabel,
+    juniorShareLabel,
     seniorShareUsdRaw,
     juniorShareUsdRaw,
     isLoading: isEstimateLoading,
@@ -80,6 +75,11 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     actionView === 'mint' ? selectedAsset?.address : undefined,
     amount,
     decimals,
+  )
+
+  const { burnOutputs, isLoading: isBurnEstimateLoading } = useGraiBurnEstimate(
+    amount,
+    actionView === 'burn',
   )
 
   useEffect(() => {
@@ -95,7 +95,18 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
     return `$${formatVaultBalanceDisplay(totalUsd, usdScale, 2)}`
   }, [amount, isEstimateLoading, juniorShareUsdRaw, seniorShareUsdRaw, usdScale])
 
-  const redeemUsdLabel = `$${mockEstimateRedeemUsd(amount)}`
+  const redeemUsdLabel = useMemo(() => {
+    if (!amount.trim()) return '$0.00'
+    if (isBurnEstimateLoading) return '…'
+    const totalUsd = burnOutputs.reduce((sum, output) => sum + output.usdRaw, 0n)
+    if (totalUsd <= 0n) return '$0.00'
+    return `$${formatVaultBalanceDisplay(totalUsd, usdScale, 2)}`
+  }, [amount, burnOutputs, isBurnEstimateLoading, usdScale])
+
+  const formatShareUsdLabel = useCallback(
+    (usdRaw: bigint) => (usdRaw > 0n ? `$${formatVaultBalanceDisplay(usdRaw, usdScale, 2)}` : '$0.00'),
+    [usdScale],
+  )
 
   const mintedGraiLabel = !amount.trim()
     ? '0.00'
@@ -171,10 +182,88 @@ export function GraiMintBurnPanel({ actionView, onActionViewChange }: Props) {
               </>
             ) : (
               <>
-                <span className="grai-action-result-label">Will be redeemed:</span>
+                <span className="grai-action-result-label">You'll receive:</span>
                 <span className="grai-action-result-value">{redeemUsdLabel}</span>
               </>
             )}
+          </div>
+          <div className={`grai-detailed-preview${isPreviewOpen ? ' is-open' : ''}`}>
+            <button
+              type="button"
+              className="grai-detailed-preview-summary"
+              aria-expanded={isPreviewOpen}
+              onClick={() => setIsPreviewOpen((open) => !open)}
+            >
+              <span>Detailed Preview</span>
+              <span className="grai-detailed-preview-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div className="grai-detailed-preview-collapse">
+              <div className="grai-detailed-preview-body">
+                {actionView === 'mint' ? (
+                  <>
+                    <div className="grai-detailed-preview-row">
+                      <span className="grai-detailed-preview-label">Sr. Vault:</span>
+                      <span className="grai-detailed-preview-value">
+                        + {isEstimateLoading ? '…' : seniorShareLabel ?? '0.0'}
+                        {selectedAsset ? (
+                          <>
+                            <img src={selectedAsset.icon} alt="" width={16} height={16} loading="lazy" decoding="async" />
+                            {selectedAsset.symbol}
+                          </>
+                        ) : null}
+                        {!isEstimateLoading ? (
+                          <span className="grai-detailed-preview-usd">({formatShareUsdLabel(seniorShareUsdRaw)})</span>
+                        ) : null}
+                      </span>
+                    </div>
+                    <div className="grai-detailed-preview-row">
+                      <span className="grai-detailed-preview-label">Jr. Vault:</span>
+                      <span className="grai-detailed-preview-value">
+                        + {isEstimateLoading ? '…' : juniorShareLabel ?? '0.0'}
+                        {selectedAsset ? (
+                          <>
+                            <img src={selectedAsset.icon} alt="" width={16} height={16} loading="lazy" decoding="async" />
+                            {selectedAsset.symbol}
+                          </>
+                        ) : null}
+                        {!isEstimateLoading ? (
+                          <span className="grai-detailed-preview-usd">({formatShareUsdLabel(juniorShareUsdRaw)})</span>
+                        ) : null}
+                      </span>
+                    </div>
+                  </>
+                ) : isBurnEstimateLoading ? (
+                  <div className="grai-detailed-preview-row">
+                    <span className="grai-detailed-preview-label">You'll receive:</span>
+                    <span className="grai-detailed-preview-value">…</span>
+                  </div>
+                ) : burnOutputs.length === 0 ? (
+                  <div className="grai-detailed-preview-row">
+                    <span className="grai-detailed-preview-label">You'll receive:</span>
+                    <span className="grai-detailed-preview-empty">Enter an amount to see the estimate</span>
+                  </div>
+                ) : (
+                  burnOutputs.map((output) => (
+                    <div key={output.asset.mint} className="grai-detailed-preview-row">
+                      <span className="grai-detailed-preview-label">You'll receive:</span>
+                      <span className="grai-detailed-preview-value">
+                        + {output.amountLabel}
+                        <img
+                          src={output.asset.icon.src}
+                          alt=""
+                          width={16}
+                          height={16}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        {output.asset.symbol}
+                        <span className="grai-detailed-preview-usd">({output.usdLabel ?? '$0.00'})</span>
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
           {isWalletConnected ? (
             <button

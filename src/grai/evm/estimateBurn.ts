@@ -23,8 +23,9 @@ function tryParseGraiAmount(amountInput: string, graiDecimals: number): bigint |
 }
 
 function formatBurnAmountLabel(redeemRaw: bigint, decimals: number): string {
-  if (redeemRaw <= 0n) return '0'
-  return formatTokenBalance(redeemRaw, decimals, BURN_AMOUNT_MAX_FRACTION_DIGITS)
+  if (redeemRaw <= 0n) return '0.0'
+  const label = formatTokenBalance(redeemRaw, decimals, BURN_AMOUNT_MAX_FRACTION_DIGITS)
+  return label.includes('.') ? label : `${label}.0`
 }
 
 export async function estimateEvmGraiBurnOutputs(

@@ -8055,7 +8055,8 @@
 /* --- Mint / Redeem button-like tabs --- */
 
 .grai-action-switch--buttons {
-  margin: 0 0 1.75rem;
+  /* Matches the 1rem gap of .grai-action-content so all panel rows are evenly spaced */
+  margin: 0 0 1rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
@@ -8304,4 +8305,135 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
+}
+
+/* --- Detailed preview dropdown --- */
+
+.grai-detailed-preview {
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  /* Same surface as .grai-amount-input */
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+[data-theme='light'] .grai-detailed-preview {
+  background: #ffffff;
+}
+
+.grai-detailed-preview-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+}
+
+.grai-detailed-preview-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--text-secondary);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grai-detailed-preview.is-open .grai-detailed-preview-chevron {
+  transform: rotate(180deg);
+}
+
+/* Smooth expand/collapse (same easing as the settings popup) */
+.grai-detailed-preview-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grai-detailed-preview.is-open .grai-detailed-preview-collapse {
+  grid-template-rows: 1fr;
+}
+
+.grai-detailed-preview-collapse > .grai-detailed-preview-body {
+  overflow: hidden;
+  min-height: 0;
+  /* Bottom padding must collapse too, otherwise it leaves dead space when closed */
+  padding-bottom: 0;
+  opacity: 0;
+  transform: scale(0.97) translateY(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    padding-bottom 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grai-detailed-preview.is-open .grai-detailed-preview-collapse > .grai-detailed-preview-body {
+  padding-bottom: 0.85rem;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grai-detailed-preview-collapse,
+  .grai-detailed-preview-collapse > .grai-detailed-preview-body,
+  .grai-detailed-preview-chevron {
+    transition: none;
+  }
+}
+
+.grai-detailed-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.grai-detailed-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.grai-detailed-preview-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.grai-detailed-preview-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.grai-detailed-preview-value img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.grai-detailed-preview-usd {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.grai-detailed-preview-empty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
